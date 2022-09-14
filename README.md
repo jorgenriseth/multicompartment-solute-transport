@@ -23,9 +23,11 @@ pip install -e .
 ### Mesh Creation
 NB: The information below is not currently correct, but will be adjusted in the future. For now, the meshes are already available as `h5`-files available in the `mesh` directory.
 ---
+
 Necessary files for recreating the mesh are available within the `mesh/`-folder. The script `mesh_generation.py` reads the `stl`-files within the `mesh/stl-files` directory, and generates the meshes. It may be run by
 ```
 ./mesh_generation.py --resolution 32
 ```
+
 Meshes of varying resolution may be created from a space-separated list of values. The scripts outputs files of format `.h5`, which may be loaded into fenics.
----
+
