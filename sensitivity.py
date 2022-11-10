@@ -43,7 +43,7 @@ pvsc_ECS_transfer_factor = float(sys.argv[4])
 BC_type = "Decay"
 
 ### Temporal parameters
-dt = 600.
+dt = 200.
 T = 3600.*6
 decay = 0.01/60.
 
@@ -65,7 +65,7 @@ comp = ['ISF', 'arteries', 'veins', 'capillaries', 'PVS arteries', 'PVS veins', 
 ncomp = len(comp)
 geo = mesh.ufl_cell()
 h = mesh.hmin()
-print(h)
+#print(h)
 
 
 
@@ -77,7 +77,7 @@ ME = MixedElement(ncomp*[P2])
 Q = FunctionSpace(mesh,ME)
 V = VectorFunctionSpace(mesh, 'Lagrange', 2)
 VV = FunctionSpace(mesh,P2)
-print(Q.dim())
+#print(Q.dim())
 p = TrialFunctions(Q)
 q = TestFunctions(Q)
 
@@ -87,11 +87,11 @@ ds = Measure('ds')() # surface
 
 # Compute surface area of the mesh and its volume
 surface_area = assemble(1.0*ds(domain=mesh))  # in mm^2
-print('Surface area: ', surface_area, ' mm^2')
+#print('Surface area: ', surface_area, ' mm^2')
 brain_volume = assemble(1*dx(domain=mesh))
-print('brain volume: ', brain_volume, ' mm^3')
+#print('brain volume: ', brain_volume, ' mm^3')
 Vcsf = 0.1 * brain_volume
-print('brain volume: ', Vcsf, ' mm^3')
+#print('brain volume: ', Vcsf, ' mm^3')
 n = FacetNormal(mesh)
 
 
@@ -158,7 +158,7 @@ gamma = np.array([[0,0,0,0,w_pae,w_pve, w_pce],
                   [w_pae,w_apa,0,0,0,0,w_papc],
                   [w_pve,0,w_vpv,0,0,0,w_pcpv],
                   [w_pce,0,0,w_cpc,w_papc,w_pcpv,0]])
-print(gamma)
+#print(gamma)
 
 osmo_cap = 20.0*133.33
 #osmo_e = 0.*osmo_cap  # If you consider the blood compartments, change this line to:
@@ -266,11 +266,11 @@ ME = MixedElement(ncomp*[P1])
 Q = FunctionSpace(mesh,ME)
 V = VectorFunctionSpace(mesh, 'Lagrange', 1)
 VV = FunctionSpace(mesh,P1)
-print(Q.dim())
+#print(Q.dim())
 p = TrialFunctions(Q)
 q = TestFunctions(Q)
 # Gaussian initial condition.
-print("Computing initial conditions")
+#print("Computing initial conditions")
 center =  (4., 2., 3.)
 spread = 1.0
 u0 = Expression(
@@ -338,7 +338,7 @@ else:
 
 
 ### ASSEMBLING
-print("Assembling diffusion problem")
+#print("Assembling diffusion problem")
 a_conc = lhs(G)
 L_conc = rhs(G)
 A_conc = assemble(a_conc)
@@ -352,7 +352,7 @@ assign(c_, [init_c_ecs, init_other,init_other,init_other])
 c1 = c_.split(True)
 
 
-results_path = Path(f"results_sensitivity/results-{BC_type}-mesh{res}-dt{int(dt)}-inulin-{len(comp)}comps-kecs{ecs_factor}-kpvscap{pvs_cap_factor}-pCSF{pCSF_factor}-wPCE{pvsc_ECS_transfer_factor}")
+results_path = Path(f"results_sensitivity/results-{BC_type}-mesh{res}-dt{int(dt)}-inulin-{len(comp)}comps-kecs{ecs_factor:.4f}-kpvscap{pvs_cap_factor:.4f}-pCSF{pCSF_factor:.4f}-wPCE{pvsc_ECS_transfer_factor:.4f}")
 results_path.mkdir(parents=True, exist_ok=True)
 
 storage_cecs = TimeSeriesStorage("w", results_path, mesh=mesh, V=VV, name="ecs")
@@ -368,8 +368,8 @@ storage_ccap.write(c1[3], 0.)
 
 # Store some vector values for total inulin amount in brain
 N0 = Constant(phi0[0] * assemble(init_c_ecs * dx))
-amount = np.zeros((int(T / dt + 1), ncomp))
-amount[0] = 1.0
+amount = np.zeros((int(T / dt + 1), ncomp+1))
+amount[0,1] = 1.0
 
 # Storage for point concentration
 concentration_p = np.zeros_like(amount)
@@ -378,23 +378,23 @@ concentration_p[0] = init_c_ecs(center)
 # Total tracer amount in system
 N = np.zeros_like(amount)
 N[0] = N0
-print("mass_init =" +str(N[0]))
+#print("mass_init =" +str(N[0]))
 times = np.zeros(len(amount))
 t=0.0
 t+=dt
 it =1
 transfer_arteries =  np.zeros_like(amount)
-
+print("solving diffusion equations")
 # Time steping
 while t< T + dt/2: # Added dt/2 to ensure final time included.
-    print('t = ', t)
+    #print('t = ', t)
     cn.assign(c_)
 
     b_conc = assemble(L_conc)
     [bc.apply(A_conc,b_conc) for bc in bcs_conc]
 
     # Solve
-    print("solving diffusion equations")
+    #print("solving diffusion equations")
 
     solve(A_conc, c_.vector(), b_conc, 'gmres', 'ilu')
     c1 = c_.split(True)
@@ -409,7 +409,8 @@ while t< T + dt/2: # Added dt/2 to ensure final time included.
     ca_ = assemble(phi0[1]*c1[1]*dx)/float(N0)
     cv_ = assemble(phi0[2]*c1[2]*dx)/float(N0)
     cc_ = assemble(phi0[3]*c1[3]*dx)/float(N0)
-    amount[it,:] = np.array([ce_,ca_,cv_,cc_])
+    amount[it,1:] = np.array([ce_,ca_,cv_,cc_])
+    amount[it,0] = t/60
     times[it] = t/60
     concentration_p[it] = c1[0](center)
 
@@ -430,10 +431,10 @@ while t< T + dt/2: # Added dt/2 to ensure final time included.
                                 transfer += assemble(lmbd[i][j]*(c_[i]-c_[j])*dx)
                                 transfer += assemble(gamma_tilde[i][j]*(p_new[i]-p_new[j])*(c_[j]+c_[i])*0.5*dx)
 
-        print("real mass total = " + str(amount[0]))
-        print("mass inside = " + str(mass_in))
-        print("g = " + str(float(g)))
-        print("Total transfer = " + str(transfer))
+        #print("real mass total = " + str(amount[0]))
+        #print("mass inside = " + str(mass_in))
+        #print("g = " + str(float(g)))
+        #print("Total transfer = " + str(transfer))
         g.assign(g - dt*mmass/Vcsf)
 
         g1.assign(g)
@@ -481,5 +482,5 @@ plt.savefig(results_path / f"inulin-multicomp-{BC_type}-dt{dt}-res{res}-{len(com
 plt.show()
 # save the clearance
 """
-np.savetxt(results_path / f"amount-multicomp-{BC_type}-dt{dt}-res{res}-{len(comp)}comps.csv", amount, delimiter=",", header='ecs,pa,pv,pc',comments='')
+np.savetxt(results_path / f"amount-multicomp-{BC_type}-dt{dt}-res{res}-{len(comp)}comps.csv", amount, delimiter=",", header='t,ecs,pa,pv,pc',comments='')
 
