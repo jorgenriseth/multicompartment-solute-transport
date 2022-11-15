@@ -124,9 +124,9 @@ kappa_f[0] = 2.0e-11*ecs_factor
 kappa_f[1] = 3.29478e-06
 kappa_f[2] = 6.58956e-06
 kappa_f[3] = 1.14276e-09
-kappa_f[4] = 1.0e-11
+kappa_f[4] = 1.0e-11*pvs_cap_factor
 kappa_f[5] = 6.514285714285714e-09
-kappa_f[6] = 3.5359801488833745e-13*pvs_cap_factor
+kappa_f[6] = 3.5359801488833745e-13
 
 
 # transfer coefficients
