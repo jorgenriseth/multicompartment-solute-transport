@@ -141,9 +141,9 @@ w_cpc = 2.98e-09
 # w_vpv = 0
 # w_cpc = 0
 
-w_pae = 2.1932017763179826e-07
+w_pae = 2.1932017763179826e-07#*pvsc_ECS_transfer_factor
 w_pve = 1.9533203320332029e-07
-w_pce = 9.976258977745193e-10*pvsc_ECS_transfer_factor
+w_pce = 9.976258977745193e-10
 
 w_ac = 1.05010501050105e-07
 w_cv = 5.250525052505252e-07
@@ -180,7 +180,7 @@ for i in range(ncomp):
 F -= 1/(0.01*133.32*60.0/1000.0*1.0e6)*(120.0*133.33*q[1]*ds - p[1]*q[1]*ds)
 F -= (3.13e-7)*(3.26*133.33*q[0]*ds - p[0]*q[0]*ds)
 
-p_CSF = 4.74*133.333
+p_CSF = 4.74*133.333*pCSF_factor
 F -= (1.25e-6)*(p_CSF*q[4]*ds - p[4]*q[4]*ds)
 
 bcs = [DirichletBC(Q.sub(2), Constant(7.0*133.33), 'on_boundary'),DirichletBC(Q.sub(5), Constant(3.26*133.33), 'on_boundary')]
@@ -207,6 +207,9 @@ p_3 = Function(VV)
 assign(p_3,p_new[6])
 
 
+velocities = np.array([[float(1/brain_volume*assemble(kappa_f[i]/nu[i]*dot(grad(p_new[i]), grad(p_new[i]))**0.5*dx)) for i in [0,4,5,6]],])
+
+
 ########
 # PART 2: the diffusion-convection equations
 ########
@@ -220,23 +223,14 @@ ncomp = len(comp)
 D_free = 2.98e-4
 D_eff =  1.03e-4
 # porosity
-phi0 = ncomp*[Constant(5e-8)]  # Porosity V_i/V_Total
-phi0[0] = 0.14
-phi0[1] = 6.e-4
-phi0[3] = 3.e-4
-phi0[2] = 2.1e-3
+
+phi0 = np.append(phi0[0], phi0[4:])
+
 # viscosity
-nu = np.array([0.0]*ncomp)
-nu[0] = 7.0e-4
-nu[1] = 7.0e-4
-nu[2] = 7.0e-4
-nu[3] = 7.0e-4
+nu = np.append(nu[0], nu[4:])
 # Permeability of fluid
-kappa_f = np.array([0.0]*ncomp)
-kappa_f[0] = 2.0e-11
-kappa_f[1] = 1.0e-11
-kappa_f[2] = 6.514285714285714e-09
-kappa_f[3] = 3.5359801488833745e-13
+kappa_f = np.append(kappa_f[0],kappa_f[4:])
+
 # INULIN exchange
 sigma_reflect_AEF = 0.2
 g_ae = w_pae*(1-sigma_reflect_AEF)
@@ -245,8 +239,9 @@ g_ve = w_pve*(1-sigma_reflect_AEF)
 g_ac = w_papc
 g_cv = w_pcpv
 gamma_tilde = np.array([[0,g_ae,g_ve,g_ce],[g_ae,0,0,g_ac],[g_ve,0,0,g_cv],[g_ce,g_ac,g_cv,0]])
+
 # From diffusion
-l_ae = 3.744331208456129e-05
+l_ae = 3.744331208456129e-05*pvsc_ECS_transfer_factor
 l_ce = 1.7198523872626686e-05
 l_ve = 3.744331208456129e-05
 l_ac = 0
@@ -483,4 +478,5 @@ plt.show()
 # save the clearance
 """
 np.savetxt(results_path / f"amount-multicomp-{BC_type}-dt{dt}-res{res}-{len(comp)}comps.csv", amount, delimiter=",", header='t,ecs,pa,pv,pc',comments='')
+np.savetxt(results_path / f"velocities-multicomp-{BC_type}-dt{dt}-res{res}-{len(comp)}comps.csv", velocities, delimiter=",", header='ecs,pa,pv,pc',comments='')
 
