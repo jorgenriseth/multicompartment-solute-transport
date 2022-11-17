@@ -1,4 +1,4 @@
-FROM ghcr.io/jorgensd/multicompartment-solute-transport:v0.1.0
+FROM ghcr.io/jorgenriseth/multicompartment-solute-transport:v0.1.0
 
 # Create user with a home directory
 ARG NB_USER
