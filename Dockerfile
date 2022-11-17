@@ -1,21 +1,22 @@
-# Use Docker image with preinstalled conda
-FROM continuumio/miniconda3
-# Install ssh (missing dependency to run conda envs)
-RUN apt-get update && \
-    apt-get install -y ssh build-essential
+FROM ghcr.io/jorgensd/multicompartment-solute-transport:v0.1.0
 
-# Upgrade conda
-RUN conda upgrade -y conda
+# Create user with a home directory
+ARG NB_USER
+ARG NB_UID=1000
+ENV USER ${NB_USER}
+ENV HOME /home/${NB_USER}
 
-# Copy environment and requirements files into docker env
-COPY environment.yml .
-COPY requirements.txt .
+# Copy current directory
+WORKDIR ${HOME}
+COPY . ${HOME}
 
-# Update environment file with new environment name
-RUN conda env update --file environment.yml --name dockerenv
-SHELL ["conda", "run", "-n", "dockerenv", "/bin/bash", "-c"]
 
-# Test dependencies
-RUN python3 -c "import dolfin; print(dolfin.__version__); import h5py; print(h5py.__version__);import SVMTK; print(SVMTK)"
 
-RUN echo "source activate dockerenv" > ~/.bashrc
+# Change ownership of home directory
+USER root
+RUN chown -R ${NB_UID} ${HOME}
+
+USER ${NB_USER}
+ENTRYPOINT []
+
+RUN python3 -c "import dolfin"
