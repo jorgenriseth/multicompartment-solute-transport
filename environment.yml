@@ -1,13 +1,11 @@
 name: test-env
 channels:
   - conda-forge
+
 dependencies:
-  - fenics-dolfin
   - pip
   - git
-  - cmake
+  - fenics-dolfin
   - pip:
-    - --use-feature=no-binary-enable-wheel-cache h5py
-    - meshio
-    - git+https://github.com/SVMTK/SVMTK.git
+    - -rrequirements.txt
   
