@@ -5,6 +5,7 @@ dependencies:
   - fenics-dolfin
   - pip
   - git
+  - cmake
   - pip:
     - --use-feature=no-binary-enable-wheel-cache h5py
     - meshio
