@@ -1,0 +1,14 @@
+name: test-env
+channels:
+  - conda-forge
+
+dependencies:
+  - pip
+  - git
+  - fenics-dolfin
+  - meshio
+  - h5py
+  - cgal
+  # NOTE: SVMTK requires 6 GB memory to build, and can therefore not be built by mybinder
+  # - pip:
+  #   - git+https://github.com/SVMTK/SVMTK.git
