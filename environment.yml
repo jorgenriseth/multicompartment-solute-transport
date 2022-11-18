@@ -8,5 +8,6 @@ dependencies:
   - fenics-dolfin
   - meshio
   - h5py
+  - cgal
   - pip:
     - git+https://github.com/jorgensd/SVMTK.git@dokken/setup
