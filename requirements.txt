@@ -1,3 +1,0 @@
-meshio
-git+https://github.com/jorgensd/SVMTK.git@dokken/setup
-h5py --use-feature=no-binary-enable-wheel-cache

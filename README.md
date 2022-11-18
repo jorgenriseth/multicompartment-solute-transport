@@ -9,18 +9,14 @@ This repository contains source code for the simulations pressented in the paper
 
 
 
-## Setup
-We recommend using conda to install necessary packages. A working environment may be created using:
-```
-conda create -n multicomp -c conda-forge fenics matplotlib jupyter
-conda activate multicomp
-pip install h5py
-pip install meshio
-pip install git+https://github.com/SVMTK/SVMTK.git
-pip install -e . 
-```
+## Installation
+### Requirements
+The codes in this repository require FEniCS, h5py, meshio and SVMTK.
+These dependencies can be installed from source, or accesed by using:
+- `conda`: The `environment.yml` file can be used with `conda env create -f environment.yml`
+- `docker`: A docker image called `ghcr.io/jorgenriseth/multicompartment-solute-transport:v0.1.0` can be used.
 
-### Mesh Creation
+## Mesh Creation
 NB: The information below is not currently correct, but will be adjusted in the future. For now, the meshes are already available as `h5`-files available in the `mesh` directory.
 ---
 

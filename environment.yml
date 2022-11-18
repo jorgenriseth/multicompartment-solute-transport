@@ -6,6 +6,7 @@ dependencies:
   - pip
   - git
   - fenics-dolfin
+  - meshio
+  - h5py
   - pip:
-    - -rrequirements.txt
-  
+    - git+https://github.com/SVMTK/SVMTK.git  
