@@ -9,4 +9,4 @@ dependencies:
   - meshio
   - h5py
   - pip:
-    - git+https://github.com/SVMTK/SVMTK.git  
+    - git+https://github.com/jorgensd/SVMTK.git@dokken/setup
