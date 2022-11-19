@@ -1,7 +1,7 @@
 """
 Multicompartment in the mouse brain.
 This is the script for the 7 compartments Inulin test case
-This scriipt cqn qlso be used to simulate the 4-compartment case (just put to zero the
+This script can also be used to simulate the 4-compartment case (just put to zero the
 fluid transfer between blood and PVS compartments)
 
 
