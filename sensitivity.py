@@ -1,7 +1,8 @@
 """
 Multicompartment in the mouse brain.
 This is the script for the 7 compartments Inulin test case
-This scriipt cqn qlso be used to simulate the 4-compartment case (just put to zero the fluid transfer between blood and PVS compartments)
+This scriipt cqn qlso be used to simulate the 4-compartment case (just put to zero the
+fluid transfer between blood and PVS compartments)
 
 
 The equations are
@@ -21,49 +22,82 @@ For this script we consider 4 compartments:
 Units are: mm for space and second for time
 Standard use for this script is
 
-python3 name_script.py
+python3 name_script.py -h for help on input parameters
 
 """
-from dolfin import *
-import numpy as np
-from ts_storage import TimeSeriesStorage
-from pathlib import Path
-import sys
 import argparse
-from typing import Sequence, Optional
+import logging
+import sys
+from pathlib import Path
+from typing import Optional, Sequence
+
+import numpy as np
+from dolfin import (Constant, DirichletBC, Expression, FiniteElement, Function,
+                    FunctionSpace, HDF5File, Measure, Mesh, MeshFunction,
+                    MixedElement, SpatialCoordinate, TestFunction,
+                    TestFunctions, TrialFunction, TrialFunctions,
+                    VectorFunctionSpace, assemble, assign, dot, exp, grad,
+                    inner, interpolate, lhs, project, rhs, solve)
+
+from ts_storage import TimeSeriesStorage
+
+__all__ = ["ForwardModel"]
 
 
 def ForwardModel(argv: Optional[Sequence[str]] = None) -> int:
+    """
+    Parse input to forward model through sys args or input to forward model
+    """
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-ecs_factor", type=float,
-                        help="Scaling factor for ECS")
+                        help="Scaling factor for ECS", required=True)
     parser.add_argument("-pvs_cap_factor", type=float,
-                        help="Scaling factor for PVS_CAP")
-    parser.add_argument("-pCFS_factor", type=float,
-                        help="Scaling factor for pCFS")
+                        help="Scaling factor for PVS_CAP", required=True)
+    parser.add_argument("-pCSF_factor", type=float,
+                        help="Scaling factor for pCFS", required=True)
     parser.add_argument("-pvsc_ECS_transfer_factor",
-                        type=float, help="Scaling factor for pvsc_ECS")
-
+                        type=float, help="Scaling factor for pvsc_ECS", required=True)
+    parser.add_argument("-BC_type", choices=["Decay", "Homogeneous", "Conservation"],
+                        type=str, help="Type of boundary condition", default="Decay")
+    parser.add_argument("-dt", type=float, help="Time step", default=200)
+    parser.add_argument("-T", type=float, help="End time",
+                        default=float(3600.*6))
+    parser.add_argument("-res", type=int, default=16, help="Mesh resolution")
+    parser.add_argument("-verbosity", type=int, choices=[0, 10, 20, 30, 40, 50],
+                        help="Select log level (0 most verbose, 50 least verbose)", default=20)
     args = vars(parser.parse_args(argv))
     forward(**args)
     return 0
 
 
-def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_ECS_transfer_factor: float):
+def forward(ecs_factor: float, pvs_cap_factor: float, pCSF_factor: float,
+            pvsc_ECS_transfer_factor: float, BC_type: str, dt: float,
+            T: float, res: int, verbosity: int):
+    """
+    Solve the forward problem
 
-    # Choose Boundary type
-    #BC_type = "Homogeneous"
-    # BC_type = "Conservation"  # You have three choices: Conservation, Homogeneous, Decay
-    BC_type = "Decay"
+    Args:
+        ecs_factor: Scaling factor for ecs
+        pvs_cap_factor: Scaling factor for pvs_cap
+        pCFS_factor: Scaling factor for pCSF
+        pvsc_ECS_transfer_factor: Scaling factor for pvsc_ECS
+        BC_type: The type of boundary condition
+        dt: The time step
+        T: The simulation end time
+        res: The mesh resolution
+        verbosity: Logging level
+    """
+    logger = logging.Logger("Forward model", level=verbosity)
+    logger.addHandler(logging.StreamHandler(sys.stdout))
+    logging.getLogger('FFC').setLevel(logging.WARNING)
+    logging.getLogger('UFL').setLevel(logging.WARNING)
 
     # Temporal parameters
-    dt = 200.
-    T = 3600.*6
     decay = 0.01/60.
 
     # Load mesh
-    res = 16
+    logger.info("Reading mesh")
     meshfile = Path(f"mesh/mesh{res}.h5")
     mesh = Mesh()
     hdf = HDF5File(mesh.mpi_comm(), str(meshfile), "r")
@@ -78,34 +112,36 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
             'PVS arteries', 'PVS veins', 'PVS capillaries']
     ncomp = len(comp)
     geo = mesh.ufl_cell()
-    h = mesh.hmin()
-    # print(h)
+
+    if verbosity <= 10:
+        logger.debug(f"Mesh hmin: {mesh.hmin()}")
 
     # Finite element functions (P1 for everything)
-    P1 = FiniteElement('CG', geo, 1)
+    P1 = FiniteElement('Lagrange', geo, 1)
     P2 = FiniteElement('Lagrange', geo, 2)
     ME = MixedElement(ncomp*[P2])
     Q = FunctionSpace(mesh, ME)
     V = VectorFunctionSpace(mesh, 'Lagrange', 2)
     VV = FunctionSpace(mesh, P2)
-    # print(Q.dim())
+    if verbosity <= 10:
+        logger.debug(f"Number of compartments: {Q.dim()}")
     p = TrialFunctions(Q)
     q = TestFunctions(Q)
 
     # Load measure data
     dx = Measure("dx", domain=mesh, subdomain_data=SD)  # Volume
-    ds = Measure('ds')()  # surface
+    ds = Measure('ds', domain=mesh)  # surface
+
+    brain_volume = assemble(1*dx)
+    Vcsf = 0.1 * brain_volume
+    logger.debug(f'brain volume: {Vcsf} mm^3')
 
     # Compute surface area of the mesh and its volume
-    surface_area = assemble(1.0*ds(domain=mesh))  # in mm^2
-    #print('Surface area: ', surface_area, ' mm^2')
-    brain_volume = assemble(1*dx(domain=mesh))
-    #print('brain volume: ', brain_volume, ' mm^3')
-    Vcsf = 0.1 * brain_volume
-    #print('brain volume: ', Vcsf, ' mm^3')
-    n = FacetNormal(mesh)
+    if verbosity <= 10:
+        surface_area = assemble(1.0*ds)  # in mm^2
+        logger.debug(f'Surface area: {surface_area} mm^2')
 
-    # PHYSICAL PARAMETERS
+    # PHYSICAL PARAMETER
     # porosity
     phi0 = ncomp*[Constant(5e-8)]  # Porosity V_i/V_Total
     phi0[0] = 0.14
@@ -142,7 +178,7 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
     w_vpv = 1.26e-10
     w_cpc = 2.98e-09
 
-    # WARNING: Comment the floowing 3 lines to have 7 compartments
+    # WARNING: Comment the following 3 lines to have 7 compartments
     # w_apa = 0
     # w_vpv = 0
     # w_cpc = 0
@@ -164,13 +200,13 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
                       [w_pae, w_apa, 0, 0, 0, 0, w_papc],
                       [w_pve, 0, w_vpv, 0, 0, 0, w_pcpv],
                       [w_pce, 0, 0, w_cpc, w_papc, w_pcpv, 0]])
-    # print(gamma)
+    logging.debug(f"gamma: {gamma}")
 
     osmo_cap = 20.0*133.33
     # osmo_e = 0.*osmo_cap  # If you consider the blood compartments, change this line to:
     osmo_e = 0.2*osmo_cap
     osmo = np.array([osmo_e, osmo_cap, osmo_cap,
-                    osmo_cap, osmo_e, osmo_e, osmo_e])
+                     osmo_cap, osmo_e, osmo_e, osmo_e])
 
     # INITIAL CONDITIONS
 
@@ -196,13 +232,13 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
            DirichletBC(Q.sub(5), Constant(3.26*133.33), 'on_boundary')]
 
     # Solving pressure equations
-    print("Solving pressure system...", sep="")
+    logger.info("Solving pressure system...")
     A = assemble(lhs(F))
     b = assemble(rhs(F))
     [bc.apply(A, b) for bc in bcs]
     p_ = Function(Q)
     solve(A, p_.vector(), b, 'gmres', 'ilu')
-    print("Done.")
+    logger.info("Pressure system solved")
 
     # Some manips to get the pressure fields for the pressure equations
     p_new = p_.split(True)
@@ -216,20 +252,20 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
     p_3 = Function(VV)
     assign(p_3, p_new[6])
 
-    velocities = np.array([[float(1/brain_volume*assemble(kappa_f[i]/nu[i] *
-                                                          dot(grad(p_new[i]), grad(p_new[i]))**0.5*dx)) for i in [0, 4, 5, 6]], ])
+    velocities = np.array([[float(1/brain_volume*assemble(
+        kappa_f[i]/nu[i] * dot(grad(p_new[i]), grad(p_new[i]))**0.5*dx)) for i in [0, 4, 5, 6]], ])
 
     ########
     # PART 2: the diffusion-convection equations
     ########
 
-    ecs_permeability = float(kappa_f[6])
+    # ecs_permeability = float(kappa_f[6])
     # Go to 4 compartments because we do not have transport in blood
     comp = ['IS', 'PVS arteries', 'PVS veins', 'PVS capillaries']
     ncomp = len(comp)
 
     # Diffusion Coefficient
-    D_free = 2.98e-4
+    # D_free = 2.98e-4
     D_eff = 1.03e-4
     # porosity
 
@@ -257,7 +293,7 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
     l_ac = 0
     l_cv = 0
     lmbd = np.array([[0, l_ae, l_ve, l_ce], [l_ae, 0, 0, l_ac],
-                    [l_ve, 0, 0, l_cv], [l_ce, l_ac, l_cv, 0]])
+                     [l_ve, 0, 0, l_cv], [l_ce, l_ac, l_cv, 0]])
 
     ME = MixedElement(ncomp*[P2])
     Q = FunctionSpace(mesh, ME)
@@ -271,17 +307,16 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
     Q = FunctionSpace(mesh, ME)
     V = VectorFunctionSpace(mesh, 'Lagrange', 1)
     VV = FunctionSpace(mesh, P1)
-    # print(Q.dim())
     p = TrialFunctions(Q)
     q = TestFunctions(Q)
     # Gaussian initial condition.
-    #print("Computing initial conditions")
+    logging.info("Computing initial conditions")
     center = (4., 2., 3.)
     spread = 1.0
-    u0 = Expression(
-        "exp(- (pow(x[0]-s[0], 2) + pow(x[1]-s[1], 2) + pow(x[2]-s[2], 2)) / (b * b))",
-        degree=1, b=Constant(spread), s=Constant(center)
-    )
+    c_ = Constant(center)
+    b = Constant(spread)
+    x = SpatialCoordinate(mesh)
+    u0 = exp((-(x[0]-c_[0])**2 + (x[1] - c_[1])**2 + (x[2] - c_[2])**2)/(b**2))
 
     # Project u0 to have a homogeneous Dirichlet boundary (might exists a lot better approaches)
     V = FunctionSpace(mesh, "Lagrange", 1)
@@ -317,54 +352,58 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
         for j in range(ncomp):
             if i != j:
                 G += Constant(lmbd[i][j])*inner(p[i]-p[j], q[i])*1./phi0[i]*dx
-                #G += Constant(gamma_tilde[i][j])*Max(p_new[i]-p_new[j],0)*p[i]*q[i]*1./phi0[i]*dx
-                #G += Constant(gamma_tilde[i][j])*Min(p_new[i]-p_new[j],0)*p[j]*q[i]*1./phi0[i]*dx
+                # G += Constant(gamma_tilde[i][j])*Max(p_new[i]-p_new[j],0)*p[i]*q[i]*1./phi0[i]*dx
+                # G += Constant(gamma_tilde[i][j])*Min(p_new[i]-p_new[j],0)*p[j]*q[i]*1./phi0[i]*dx
                 G += Constant(gamma_tilde[i][j])*(p_new[i] -
                                                   p_new[j])*(p[j]+p[i])*0.5*q[i]*1./phi0[i]*dx
 
     # Boundary conditions for tracer concentration
     if BC_type == "Homogeneous":
         A_in = Expression('C', C=0, degree=1)
-        bcs_conc = [DirichletBC(Q.sub(1), A_in, 'on_boundary'), DirichletBC(
-            Q.sub(2), A_in, 'on_boundary'), DirichletBC(Q.sub(0), A_in, 'on_boundary')]
+        bcs_conc = [DirichletBC(Q.sub(1), A_in, 'on_boundary'),
+                    DirichletBC(Q.sub(2), A_in, 'on_boundary'),
+                    DirichletBC(Q.sub(0), A_in, 'on_boundary')]
     elif BC_type == "Conservation":
         g0 = 0.0  # Zero concentration at the beginning
         g = Constant(g0)
         g1 = Constant(g)
         g2 = Constant(g)
         g00 = Constant(g)
-        bcs_conc = [DirichletBC(Q.sub(1), g1, 'on_boundary'), DirichletBC(
-            Q.sub(2), g2, 'on_boundary'), DirichletBC(Q.sub(0), g00, 'on_boundary')]
+        bcs_conc = [DirichletBC(Q.sub(1), g1, 'on_boundary'),
+                    DirichletBC(Q.sub(2), g2, 'on_boundary'),
+                    DirichletBC(Q.sub(0), g00, 'on_boundary')]
     elif BC_type == "Decay":
         g0 = 0.0  # Zero concentration at the beginning
         g = Constant(g0)
         g1 = Constant(g)
         g2 = Constant(g)
         g00 = Constant(g)
-        bcs_conc = [DirichletBC(Q.sub(1), g1, 'on_boundary'), DirichletBC(
-            Q.sub(2), g2, 'on_boundary'), DirichletBC(Q.sub(0), g00, 'on_boundary')]
+        bcs_conc = [DirichletBC(Q.sub(1), g1, 'on_boundary'),
+                    DirichletBC(Q.sub(2), g2, 'on_boundary'),
+                    DirichletBC(Q.sub(0), g00, 'on_boundary')]
     elif BC_type == "zeroNeum":
         bcs_conc = []
     else:
-        print('Wrong Boundary conditions')
-        exit(0)
+        raise ValueError(f"Invalid boundary condition {BC_type}")
 
     # ASSEMBLING
-    #print("Assembling diffusion problem")
+    logger.info("Assembling diffusion problem")
     a_conc = lhs(G)
     L_conc = rhs(G)
     A_conc = assemble(a_conc)
 
     czero = Expression('0.0', degree=1)
-    #init_c_ecs = interpolate(u0, Q.sub(0).collapse())
+    # init_c_ecs = interpolate(u0, Q.sub(0).collapse())
     init_other = interpolate(czero, V)
     c_ = Function(Q)  # Function to save solution
     assign(c_, [init_c_ecs, init_other, init_other, init_other])
     [bc.apply(c_.vector()) for bc in bcs_conc]
     c1 = c_.split(True)
 
-    results_path = Path(
-        f"results_sensitivity/results-{BC_type}-mesh{res}-dt{int(dt)}-inulin-{len(comp)}comps-kecs{ecs_factor:.4f}-kpvscap{pvs_cap_factor:.4f}-pCSF{pCSF_factor:.4f}-wPCE{pvsc_ECS_transfer_factor:.4f}")
+    rpath = f"results_sensitivity/results-{BC_type}-mesh{res}-dt{int(dt)}-inulin" +\
+        f"-{len(comp)}comps-kecs{ecs_factor:.4f}-kpvscap{pvs_cap_factor:.4f}" +\
+            f"-pCSF{pCSF_factor:.4f}-wPCE{pvsc_ECS_transfer_factor:.4f}"
+    results_path = Path(rpath)
     results_path.mkdir(parents=True, exist_ok=True)
 
     storage_cecs = TimeSeriesStorage(
@@ -394,23 +433,23 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
     # Total tracer amount in system
     N = np.zeros_like(amount)
     N[0] = N0
-    #print("mass_init =" +str(N[0]))
+    logger.debug(f"mass_init = {N[0]}")
+
     times = np.zeros(len(amount))
     t = 0.0
     t += dt
     it = 1
-    transfer_arteries = np.zeros_like(amount)
-    print("solving diffusion equations")
+    logger.info("Solving diffusion equations")
     # Time steping
     while t < T + dt/2:  # Added dt/2 to ensure final time included.
-        #print('t = ', t)
+        logger.debug(f't = {t} ')
         cn.assign(c_)
 
         b_conc = assemble(L_conc)
         [bc.apply(A_conc, b_conc) for bc in bcs_conc]
 
         # Solve
-        #print("solving diffusion equations")
+        logger.debug("Solving diffusion equations")
 
         solve(A_conc, c_.vector(), b_conc, 'gmres', 'ilu')
         c1 = c_.split(True)
@@ -432,7 +471,7 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
 
         # Prepare boundary conditions
         if BC_type == "Conservation":
-            mass_out = 0
+            # mass_out = 0
             mass_in = 0
             mmass = 0
             for j in range(ncomp):
@@ -446,10 +485,10 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
                         transfer += assemble(gamma_tilde[i][j] *
                                              (p_new[i]-p_new[j])*(c_[j]+c_[i])*0.5*dx)
 
-            #print("real mass total = " + str(amount[0]))
-            #print("mass inside = " + str(mass_in))
-            #print("g = " + str(float(g)))
-            #print("Total transfer = " + str(transfer))
+            logger.debug(f"real mass total = {amount[0]}")
+            logger.debug(f"mass inside = {mass_in}")
+            logger.debug(f"g = {float(g)}")
+            logger.debug(f"Total transfer {transfer}")
             g.assign(g - dt*mmass/Vcsf)
 
             g1.assign(g)
@@ -457,7 +496,8 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
             g00.assign(g)
 
         elif BC_type == "Decay":
-            #mass_out = assemble(phi0[0]*D_eff/Vcsf* grad(c1[0])*n * ds + phi0[0]*kappa_f[0]/(Vcsf*nu[0])*c1[0]*grad(p_new[0])*n *ds )
+            # mass_out = assemble(phi0[0]*D_eff/Vcsf* grad(c1[0])*n * ds +\
+            #  phi0[0]*kappa_f[0]/(Vcsf*nu[0])*c1[0]*grad(p_new[0])*n *ds )
             mass_in = 0
             mmass = 0
             for j in range(ncomp):
@@ -493,14 +533,18 @@ def forward(ecs_factor: float, pvs_cap_factor: float, pCFS_factor: float, pvsc_E
     plt.plot(times, amount, label="Multicompartment")
     plt.legend()
     # plt.ylim(0, None, auto=True)
-    plt.savefig(results_path / f"inulin-multicomp-{BC_type}-dt{dt}-res{res}-{len(comp)}comps.png", bbox_inches='tight')
+    plt.savefig(
+        results_path / f"inulin-multicomp-{BC_type}-dt{dt}-res{res}-{len(comp)}comps.png",
+        bbox_inches='tight')
     plt.show()
     # save the clearance
     """
-    np.savetxt(results_path / f"amount-multicomp-{BC_type}-dt{dt}-res{res}-{len(comp)}comps.csv",
-               amount, delimiter=",", header='t,ecs,pa,pv,pc', comments='')
-    np.savetxt(results_path / f"velocities-multicomp-{BC_type}-dt{dt}-res{res}-{len(comp)}comps.csv",
-               velocities, delimiter=",", header='ecs,pa,pv,pc', comments='')
+    np.savetxt(
+        results_path / f"amount-multicomp-{BC_type}-dt{dt}-res{res}-{len(comp)}comps.csv",
+        amount, delimiter=",", header='t,ecs,pa,pv,pc', comments='')
+    np.savetxt(
+        results_path / f"velocities-multicomp-{BC_type}-dt{dt}-res{res}-{len(comp)}comps.csv",
+        velocities, delimiter=",", header='ecs,pa,pv,pc', comments='')
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ dependencies:
   - h5py
   - cgal
   - matplotlib
+  - pandas
   # NOTE: SVMTK requires 6 GB memory to build, and can therefore not be built by mybinder
   # - pip:
   #   - git+https://github.com/SVMTK/SVMTK.git
