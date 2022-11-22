@@ -8,6 +8,7 @@ dependencies:
   - matplotlib
   - pandas
   - git
+  - python=3.10
   - pip
   - pip:
      - git+https://github.com/SVMTK/SVMTK.git
