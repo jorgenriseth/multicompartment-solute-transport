@@ -11,8 +11,8 @@ This repository contains source code for the simulations pressented in the paper
 
 ## Installation
 ### Requirements
-The codes in this repository require FEniCS, h5py, meshio and SVMTK.
-These dependencies can be installed from source, or accesed by using:
+The codes in this repository require `FEniCS`, `h5py`, `meshio` and `SVMTK`.
+These dependencies can be installed from source, or accessed by using:
 - `conda`: The `environment.yml` file can be used with `conda env create -f environment.yml`
 - `docker`: A docker image called `ghcr.io/jorgenriseth/multicompartment-solute-transport:v0.1.0` can be used.
 
