@@ -1,14 +1,12 @@
 name: test-env
 channels:
   - conda-forge
+  - dokken
 dependencies:
   - fenics-dolfin
   - meshio
   - h5py
   - matplotlib
   - pandas
-  - git
   - python=3.10
-  - pip
-  - pip:
-     - git+https://github.com/SVMTK/SVMTK.git
+  - svmtk
