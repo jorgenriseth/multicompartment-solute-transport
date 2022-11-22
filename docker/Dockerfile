@@ -16,8 +16,6 @@ COPY environment.yml .
 RUN mamba env update --file environment.yml --name dockerenv
 SHELL ["mamba", "run", "-n", "dockerenv", "/bin/bash", "-c"]
 
-RUN python3 -m pip install git+https://github.com/SVMTK/SVMTK
-
 # Test dependencies
 RUN python3 -c "import dolfin; print(dolfin.__version__); import h5py; print(h5py.__version__);import SVMTK; print(SVMTK)"
 RUN python3 -c "import SVMTK; print(SVMTK); import dolfin; print(dolfin.__version__); import h5py; print(h5py.__version__)"
