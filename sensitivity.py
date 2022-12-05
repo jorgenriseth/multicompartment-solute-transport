@@ -32,10 +32,17 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import sys
 
-ecs_factor = float(sys.argv[1])
-pvs_cap_factor = float(sys.argv[2])
-pCSF_factor = float(sys.argv[3])
-pvsc_ECS_transfer_factor = float(sys.argv[4])
+model = 7   # 4 comp or 7 comp
+
+k_e_factor = float(sys.argv[1])
+k_pa_factor = float(sys.argv[2])
+k_pc_factor = float(sys.argv[3])
+pCSF_factor = float(sys.argv[4])
+p_ae_diff_factor = float(sys.argv[5])
+gamma_paa_factor = float(sys.argv[6])
+D_factor = float(sys.argv[7])
+phi_pa_factor = float(sys.argv[8])
+p_dict = {'k_e':k_e_factor, 'k_pa':k_pa_factor, 'k_pc':k_pc_factor, 'pCSF':pCSF_factor, 'p_ae_diff':p_ae_diff_factor, 'gamma_paa':gamma_paa_factor, 'D':D_factor, 'phi_pa':phi_pa_factor}
 
 # Choose Boundary type
 #BC_type = "Homogeneous"
@@ -103,7 +110,7 @@ phi0[0] = 0.14
 phi0[1] = 0.00658
 phi0[2] = 0.02303
 phi0[3] = 0.00329
-phi0[4] = 6.e-4
+phi0[4] = 6.e-4*phi_pa_factor
 phi0[5] = 2.1e-3
 phi0[6] = 3.e-4
 
@@ -120,35 +127,37 @@ nu[6] = 7.0e-4
 
 # Permeability of fluid
 kappa_f = np.array([0.0]*ncomp)
-kappa_f[0] = 2.0e-11*ecs_factor
+kappa_f[0] = 2.0e-11*k_e_factor
 kappa_f[1] = 3.29478e-06
 kappa_f[2] = 6.58956e-06
-kappa_f[3] = 1.14276e-09
-kappa_f[4] = 1.0e-11*pvs_cap_factor
+kappa_f[3] = 8.811e-09
+kappa_f[4] = 1.0e-11*k_pa_factor
 kappa_f[5] = 6.514285714285714e-09
-kappa_f[6] = 3.5359801488833745e-13
+kappa_f[6] = 3.5359801488833745e-13*k_pc_factor
 
 
 # transfer coefficients
 
-w_apa = 5.89e-09
+w_apa = 5.89e-09*gamma_paa_factor
 w_vpv = 1.26e-10
 w_cpc = 2.98e-09
 
 
 # WARNING: Comment the floowing 3 lines to have 7 compartments
-# w_apa = 0
-# w_vpv = 0
-# w_cpc = 0
+
+if model == 4:
+    w_apa = 0
+    w_vpv = 0
+    w_cpc = 0
 
 w_pae = 2.1932017763179826e-07#*pvsc_ECS_transfer_factor
 w_pve = 1.9533203320332029e-07
 w_pce = 9.976258977745193e-10
 
-w_ac = 1.05010501050105e-07
-w_cv = 5.250525052505252e-07
-w_papc = 2.5002500250025003e-08
-w_pcpv = 1.0001000100010001e-07
+w_ac = 3.137483804633168e-06
+w_cv = 9.653796321948209e-06
+w_papc = 1.8283957344241566e-07
+w_pcpv = 7.313582937696626e-07
 
 # Fluid pressure exchange
 gamma = np.array([[0,0,0,0,w_pae,w_pve, w_pce],
@@ -221,7 +230,7 @@ ncomp = len(comp)
 
 # Diffusion Coefficient
 D_free = 2.98e-4
-D_eff =  1.03e-4
+D_eff =  1.03e-4*D_factor
 # porosity
 
 phi0 = np.append(phi0[0], phi0[4:])
@@ -241,7 +250,7 @@ g_cv = w_pcpv
 gamma_tilde = np.array([[0,g_ae,g_ve,g_ce],[g_ae,0,0,g_ac],[g_ve,0,0,g_cv],[g_ce,g_ac,g_cv,0]])
 
 # From diffusion
-l_ae = 3.744331208456129e-05*pvsc_ECS_transfer_factor
+l_ae = 3.744331208456129e-05*p_ae_diff_factor
 l_ce = 1.7198523872626686e-05
 l_ve = 3.744331208456129e-05
 l_ac = 0
@@ -347,7 +356,11 @@ assign(c_, [init_c_ecs, init_other,init_other,init_other])
 c1 = c_.split(True)
 
 
-results_path = Path(f"results_sensitivity/results-{BC_type}-mesh{res}-dt{int(dt)}-inulin-{len(comp)}comps-kecs{ecs_factor:.4f}-kpvscap{pvs_cap_factor:.4f}-pCSF{pCSF_factor:.4f}-wPCE{pvsc_ECS_transfer_factor:.4f}")
+#results_path_base = Path(f"results_sensitivity/results-{BC_type}-mesh{res}-dt{int(dt)}-inulin-{len(comp)}comps-k_e{k_e_factor:.4f}-k_pa{k_pa_factor:.4f}-k_pc{k_pc_factor:.4f}-pCSF{pCSF_factor:.4f}-p_aee_diff{p_ae_diff_factor:.4f}-gamma_paa{gamma_paa_factor:.4f}-D{D_factor:.4f}")
+
+results_path_base = f"results_sensitivity/results-{BC_type}-mesh{res}-dt{int(dt)}-inulin-{model}comps-"
+results_path_params = '-'.join([f'{key}{value:.4f}' for key,value in p_dict.items()])
+results_path = Path(results_path_base+results_path_params)
 results_path.mkdir(parents=True, exist_ok=True)
 
 storage_cecs = TimeSeriesStorage("w", results_path, mesh=mesh, V=VV, name="ecs")
