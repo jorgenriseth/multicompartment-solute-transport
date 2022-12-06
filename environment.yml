@@ -1,7 +1,6 @@
 name: test-env
 channels:
   - conda-forge
-  - dokken
 dependencies:
   - fenics-dolfin
   - meshio
