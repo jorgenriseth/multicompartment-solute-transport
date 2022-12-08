@@ -3,7 +3,7 @@ import numpy as np
 
 def compute_coefficients(type_exp):
     """
-        This function computes the coefficients for the multicompartment model. 
+        This function computes the coefficients for the multicompartment model.
         Input: none
         Output: dict of coefficients. The main script reads the coeffs from it.
     """
@@ -157,15 +157,15 @@ def compute_coefficients(type_exp):
     ## For Inulin
     # Computing effective diffusion in AEF pores at the capillary level
     Dv = 10000.0e-6  # diameter capillary
-    D_Free_Inulin = 2.98e-6  # Free diffusion coefficient
+    D_Free_Inulin = 2.98e-4  # Free diffusion coefficient # FIXED: paper reports 2.98e-6 cm^2/s -> 2.98e-4 mm^2/s
     a_Inulin = 15.2e-7  # mm
 
     L_AEF = 1000.0e-6  # Width of AEF (assumed constant at the different levels)
     B_AEF = 10.0e-6  # mm can inccrease up to 1000e-6 (We assume very small because we are at the capillary level)
     beta = a_Inulin / B_AEF
     D_eff_AEF_Inulin = D_Free_Inulin * (
-        1 - 2.10444 * pow(beta, 6) + 2.08877 * pow(beta, 3) - 0.094813 * pow(beta, 5) - 1.372 * pow(beta, 6)
-    )
+        1 - 2.10444 * beta + 2.08877 * pow(beta, 3) - 0.094813 * pow(beta, 5) - 1.372 * pow(beta, 6)
+    )  # FIXED: removed errouneous beta**6 in second term.
 
     R_AEF_Inulin = L_AEF / (2 * B_AEF * D_eff_AEF_Inulin)
 
@@ -181,8 +181,8 @@ def compute_coefficients(type_exp):
     B_AEF = 250.0e-6  # mm can decrease to 2.5e-6 (We assume large because we are at the venous and arterial levels)
     beta = a_Inulin / B_AEF
     D_eff_AEF_Inulin = D_Free_Inulin * (
-        1 - 2.10444 * pow(beta, 6) + 2.08877 * pow(beta, 3) - 0.094813 * pow(beta, 5) - 1.372 * pow(beta, 6)
-    )
+        1 - 2.10444 * beta + 2.08877 * pow(beta, 3) - 0.094813 * pow(beta, 5) - 1.372 * pow(beta, 6)
+    )  # FIXED: removed errouneous beta**6 in second term.
 
     R_AEF_Inulin = L_AEF / (2 * B_AEF * D_eff_AEF_Inulin)
 
@@ -522,10 +522,10 @@ def compute_coefficients(type_exp):
     main_dict["lambda_pv_e_Inulin"] = lambda_pv_e_Inulin
     main_dict["lambda_pc_e_Inulin"] = lambda_pc_e_Inulin
     main_dict["tilde_gamma_pa_e_Inulin"] = tilde_gamma_pa_e_Inulin
-    main_dict["tilde_gamma_pa_e_Inulin"] = tilde_gamma_pc_e_Inulin
-    main_dict["tilde_gamma_pa_e_Inulin"] = tilde_gamma_pv_e_Inulin
-    main_dict["tilde_gamma_pa_e_Inulin"] = tilde_gamma_pa_pc_Inulin
-    main_dict["tilde_gamma_pa_e_Inulin"] = tilde_gamma_pc_pv_Inulin
+    main_dict["tilde_gamma_pc_e_Inulin"] = tilde_gamma_pc_e_Inulin
+    main_dict["tilde_gamma_pv_e_Inulin"] = tilde_gamma_pv_e_Inulin
+    main_dict["tilde_gamma_pa_pc_Inulin"] = tilde_gamma_pa_pc_Inulin
+    main_dict["tilde_gamma_pc_pv_Inulin"] = tilde_gamma_pc_pv_Inulin
 
     main_dict["L_e_SAS"] = L_e_SAS
     main_dict["L_pa_SAS"] = L_pa_SAS
@@ -553,3 +553,7 @@ def compute_coefficients(type_exp):
         main_dict["kappa_pc"] = kappa_pc * 16.0
 
     return main_dict
+
+
+if __name__ == "__main__":
+    compute_coefficients(None)
