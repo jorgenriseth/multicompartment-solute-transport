@@ -3,18 +3,18 @@ import numpy as np
 
 def compute_coefficients(type_exp):
     """
-        This function computes the coefficients for the multicompartment model. 
+        This function computes the coefficients for the multicompartment model.
         Input: none
         Output: dict of coefficients. The main script reads the coeffs from it.
     """
     # init main dict
     main_dict = {}
-    
-    # Small script to compute the right coefficients. 
+
+    # Small script to compute the right coefficients.
     volume_brain_human = 1.0e6 #mm^3
     volume_brain_rat = 2311.
     mmHgToPa = 133.32
-    
+
     # From El Bouri + Payne, we know
     #Kc = 4.28e-4 # in mm^3 s kg^-1
     Ka = 1.234
@@ -24,7 +24,7 @@ def compute_coefficients(type_exp):
 
     # permeability and viscosity
     mu_blood = 2.67e-3 #Pa.s
-    kc = Kc*1e-9*mu_blood 
+    kc = Kc*1e-9*mu_blood
     ka = Ka*1e-9*mu_blood
     kv = Kv*1e-9*mu_blood
 
@@ -46,7 +46,7 @@ def compute_coefficients(type_exp):
     # 1st step determine the ration
     # We know the permeability in the ECS and its resistance
     kappa_ECS = 2.0e-11 # mm^2
-    R_ECS = 0.57 * factor_resistance 
+    R_ECS = 0.57 * factor_resistance
     mu_CSF = 7.e-4 # Pa.s
     ratio_L_A = kappa_ECS*R_ECS/mu_CSF
     print('ratio L/A = ' +str(ratio_L_A))
@@ -69,7 +69,7 @@ def compute_coefficients(type_exp):
     print("kappa_pc = " +str(kappa_pc))
 
     print("kappa_ECS = " +str(kappa_ECS))
-    
+
     ## Transfer coefficients
     # across BBB
     # Hydraulic conductivity
@@ -136,13 +136,13 @@ def compute_coefficients(type_exp):
     gamma_a_c = B_blood/(deltap_a_c*volume_brain_rat)
     gamma_c_v = B_blood/(deltap_c_v*volume_brain_rat)
 
-    
+
 
     print("\ngamma_a_c = " + str(gamma_a_c))
     print("gamma_c_v = " +str(gamma_c_v))
     print("gamma_pa_pc = " +str(gamma_pa_pc))
     print("gamma_pc_pv = " +str(gamma_pc_pv))
-    
+
     # Coefficient boundaries
     print("\n### Hydraulic conductivities at pial surface")
     surface_brain = 1750*1.e2
@@ -152,7 +152,7 @@ def compute_coefficients(type_exp):
     print("L_pa_SAS = " + str(gamma_pa_e/surface_brain*volume_brain_human))
     L_e_SAS = gamma_e_SAS/surface_brain
     L_pa_SAS = gamma_pa_e/surface_brain*volume_brain_human
-    
+
 
     ### Diffusive Permeabilities
     print("\n### Computing diffusive permeability coefficients ###")
@@ -163,13 +163,13 @@ def compute_coefficients(type_exp):
     ## For Inulin
     # Computing effective diffusion in AEF pores at the capillary level
     Dv = 10000.0e-6 # diameter capillary
-    D_Free_Inulin = 2.98e-6 # Free diffusion coefficient
+    D_Free_Inulin = 2.98e-4 # Free diffusion coefficient # FIXED: paper reports 2.98e-6 cm^2/s -> 2.98e-4 mm^2/s
     a_Inulin = 15.2e-7 # mm
 
     L_AEF = 1000.0e-6 # Width of AEF (assumed constant at the different levels)
     B_AEF = 10.0e-6 # mm can inccrease up to 1000e-6 (We assume very small because we are at the capillary level)
     beta = a_Inulin/B_AEF
-    D_eff_AEF_Inulin = D_Free_Inulin*(1-2.10444*pow(beta,6) +2.08877*pow(beta,3) - 0.094813*pow(beta,5) - 1.372*pow(beta,6))
+    D_eff_AEF_Inulin = D_Free_Inulin*(1-2.10444*beta +2.08877*pow(beta,3) - 0.094813*pow(beta,5) - 1.372*pow(beta,6)) # FIXED: removed errouneous beta**6 in second term.
 
     R_AEF_Inulin = L_AEF/(2*B_AEF*D_eff_AEF_Inulin)
 
@@ -185,7 +185,7 @@ def compute_coefficients(type_exp):
 
     B_AEF = 250.0e-6 # mm can decrease to 2.5e-6 (We assume large because we are at the venous and arterial levels)
     beta = a_Inulin/B_AEF
-    D_eff_AEF_Inulin = D_Free_Inulin*(1-2.10444*pow(beta,6) +2.08877*pow(beta,3) - 0.094813*pow(beta,5) - 1.372*pow(beta,6))
+    D_eff_AEF_Inulin = D_Free_Inulin*(1-2.10444*beta +2.08877*pow(beta,3) - 0.094813*pow(beta,5) - 1.372*pow(beta,6)) # FIXED: removed errouneous beta**6 in second term.
 
     R_AEF_Inulin = L_AEF/(2*B_AEF*D_eff_AEF_Inulin)
 
@@ -197,7 +197,7 @@ def compute_coefficients(type_exp):
     print("\nlambda_pa,e_Inulin = "  +str(lambda_pa_e_Inulin))
     print("lambda_pc,e_Inulin = "  +str(lambda_pc_e_Inulin))
     print("lambda_pv,e_Inulin = "  +str(lambda_pv_e_Inulin))
-    
+
     print("\n## For Amyloid-beta ##")
     print("# Across the BBB#") # We need to bring down all the different layers
     ## Capillary level
@@ -218,7 +218,7 @@ def compute_coefficients(type_exp):
 
     # SGL layer
     B= 9.0e-6 # width of inter-endothelial cleft
-    L_f = 250.0e-6 # Glycocalyx layer thickness 
+    L_f = 250.0e-6 # Glycocalyx layer thickness
     r_f = 6e-6 # radius of fibers
     eps = 1-0.326 # volume fraction of void in glycocalyx layer
     D_f_AB =  D_Free_AB*(np.exp( -pow(1-eps,0.5)*(1+ a_AB/(r_f )) )) # unordered fibers see Michel 1999
@@ -233,8 +233,8 @@ def compute_coefficients(type_exp):
     R_1_AB = L_1/(2*B*D_c_AB)
 
     # small silt in the junction strand
-    L_jun = 11.0e-6 # Thickness of tight junction strand 
-    B_s = 2.5e-6  # Width of the small slit of the tight junction strand (Allt and Lawrenson, 1997; Cassella et al., 1997) 
+    L_jun = 11.0e-6 # Thickness of tight junction strand
+    B_s = 2.5e-6  # Width of the small slit of the tight junction strand (Allt and Lawrenson, 1997; Cassella et al., 1997)
     beta = a_AB/B_s
     D_sl_AB =  D_Free_AB*(1-2.10444*pow(beta,6) +2.08877*pow(beta,3) - 0.094813*pow(beta,5) - 1.372*pow(beta,6))
     R_2_AB = L_jun/(2*B_s*D_sl_AB)
@@ -276,7 +276,7 @@ def compute_coefficients(type_exp):
 
     # SGL layer
     B= 9.0e-6 # width of inter-endothelial cleft
-    L_f = 400.0e-6 # Glycocalyx layer thickness (assumed to be large at this level) 
+    L_f = 400.0e-6 # Glycocalyx layer thickness (assumed to be large at this level)
     r_f = 6e-6 # radius of fibers
     eps = 1-0.326 # volume fraction of void in glycocalyx layer
     D_f_AB =  D_Free_AB*(np.exp( -pow(1-eps,0.5)*(1+ a_AB/(r_f )) )) # unordered fibers see Michel 1999
@@ -291,8 +291,8 @@ def compute_coefficients(type_exp):
     R_1_AB = L_1/(2*B*D_c_AB)
 
     # small silt in the junction strand
-    L_jun = 11.0e-6 # Thickness of tight junction strand 
-    B_s = 0.5e-6  # Width of the small slit of the tight junction strand (Allt and Lawrenson, 1997; Cassella et al., 1997) 
+    L_jun = 11.0e-6 # Thickness of tight junction strand
+    B_s = 0.5e-6  # Width of the small slit of the tight junction strand (Allt and Lawrenson, 1997; Cassella et al., 1997)
     beta = a_AB/B_s
     D_sl_AB =  D_Free_AB*(1-2.10444*pow(beta,6) +2.08877*pow(beta,3) - 0.094813*pow(beta,5) - 1.372*pow(beta,6))
     R_2_AB = L_jun/(2*B_s*D_sl_AB)
@@ -334,7 +334,7 @@ def compute_coefficients(type_exp):
 
     # SGL layer
     B= 9.0e-6 # width of inter-endothelial cleft
-    L_f = 100.0e-6 # Glycocalyx layer thickness (assumed to be large at this level) 
+    L_f = 100.0e-6 # Glycocalyx layer thickness (assumed to be large at this level)
     r_f = 6e-6 # radius of fibers
     eps = 1-0.326 # volume fraction of void in glycocalyx layer
     D_f_AB =  D_Free_AB*(np.exp( -pow(1-eps,0.5)*(1+ a_AB/(r_f )) )) # unordered fibers see Michel 1999
@@ -349,8 +349,8 @@ def compute_coefficients(type_exp):
     R_1_AB = L_1/(2*B*D_c_AB)
 
     # small silt in the junction strand
-    L_jun = 11.0e-6 # Thickness of tight junction strand 
-    B_s = 10.0e-6  # Width of the small slit of the tight junction strand (Allt and Lawrenson, 1997; Cassella et al., 1997) 
+    L_jun = 11.0e-6 # Thickness of tight junction strand
+    B_s = 10.0e-6  # Width of the small slit of the tight junction strand (Allt and Lawrenson, 1997; Cassella et al., 1997)
     beta = a_AB/B_s
     D_sl_AB =  D_Free_AB*(1-2.10444*pow(beta,6) +2.08877*pow(beta,3) - 0.094813*pow(beta,5) - 1.372*pow(beta,6))
     R_2_AB = L_jun/(2*B_s*D_sl_AB)
@@ -395,7 +395,7 @@ def compute_coefficients(type_exp):
 
     ### Convective mass exchange
     ## Note The reflection coefficient is often found from microvessels but it depends on the membrane itself.
-    ## Whether this value changes from the AEF membrane only is unclear. Might need further investigation. 
+    ## Whether this value changes from the AEF membrane only is unclear. Might need further investigation.
     ## Inulin
     sigma_reflect = 0.2
 
@@ -411,7 +411,7 @@ def compute_coefficients(type_exp):
     tilde_gamma_pa_pc_Inulin = gamma_pa_pc
     tilde_gamma_pc_pv_Inulin = gamma_pc_pv
 
-    ## Amyloid beta 
+    ## Amyloid beta
     sigma_reflect = 0.1
 
     tilde_gamma_a_e_AB = gamma_a_e*(1-sigma_reflect)
@@ -430,38 +430,38 @@ def compute_coefficients(type_exp):
     # For connected channels, we assume that there is not a membrane (so no diffusive transfer)
     sigma_reflect = 0.0
 
-    tilde_gamma_a_c_AB = gamma_a_c 
+    tilde_gamma_a_c_AB = gamma_a_c
     tilde_gamma_c_v_AB = gamma_c_v
     tilde_gamma_pa_pc_AB = gamma_pa_pc
     tilde_gamma_pc_pv_AB = gamma_pc_pv
 
     print("\n### Convective mass transfer ###\n")
-    print("## For Inulin\n") 
+    print("## For Inulin\n")
     print("tilde_gamma_pa_e_Inulin = "+str(tilde_gamma_pa_e_Inulin))
     print("tilde_gamma_pv_e_Inulin = "+str(tilde_gamma_pv_e_Inulin))
     print("tilde_gamma_pc_e_Inulin = "+str(tilde_gamma_pc_e_Inulin))
 
     print("\ntilde_gamma_pa_pc_Inulin = "+str(tilde_gamma_pa_pc_Inulin))
     print("tilde_gamma_pc_pv_Inulin = "+str(tilde_gamma_pc_pv_Inulin))
-    
-    
-    
 
-    print("\n## For Amyloid-Beta\n") 
 
-    print("tilde_gamma_a_e_AB = " + str(tilde_gamma_a_e_AB)) 
-    print("tilde_gamma_v_e_AB = " + str(tilde_gamma_v_e_AB)) 
-    print("tilde_gamma_c_e_AB  = "+ str(tilde_gamma_c_e_AB)) 
+
+
+    print("\n## For Amyloid-Beta\n")
+
+    print("tilde_gamma_a_e_AB = " + str(tilde_gamma_a_e_AB))
+    print("tilde_gamma_v_e_AB = " + str(tilde_gamma_v_e_AB))
+    print("tilde_gamma_c_e_AB  = "+ str(tilde_gamma_c_e_AB))
 
     print("tilde_gamma_pa_e_AB = " + str(tilde_gamma_pa_e_AB))
-    print("tilde_gamma_pv_e_AB = " + str(tilde_gamma_pv_e_AB)) 
+    print("tilde_gamma_pv_e_AB = " + str(tilde_gamma_pv_e_AB))
     print("tilde_gamma_pc_e_AB = " + str(tilde_gamma_pc_e_AB))
 
     print("tilde_gamma_a_pa_AB = " + str(tilde_gamma_a_pa_AB))
     print("tilde_gamma_v_pv_AB = " + str(tilde_gamma_v_pv_AB))
     print("tilde_gamma_c_pc_AB = " + str(tilde_gamma_c_pc_AB))
-    
-    
+
+
     # Save to dictionary
 
     volume_fraction_of_blood = 3.29/100.
@@ -469,7 +469,7 @@ def compute_coefficients(type_exp):
     veins_frac = 0.46
     capillaries_frac = 0.33
     PVS_fraction = 1./100.
-    
+
     main_dict["phi_e"] = 0.14
     main_dict["phi_a"] = volume_fraction_of_blood*arteries_frac
     main_dict["phi_v"] = volume_fraction_of_blood*veins_frac
@@ -487,10 +487,10 @@ def compute_coefficients(type_exp):
     print("phi_pv = "+str(main_dict["phi_pv"]))
     print("phi_pc = "+str(main_dict["phi_pc"]))
 
-    
+
     main_dict["mu_blood"] = mu_blood
     main_dict["mu_csf"] = mu_CSF
-    
+
     main_dict["gamma_a_e"] = gamma_a_e
     main_dict["gamma_v_e"] = gamma_v_e
     main_dict["gamma_c_e"] = gamma_c_e
@@ -509,20 +509,20 @@ def compute_coefficients(type_exp):
     main_dict["kappa_c"] = kappa_c
     main_dict["kappa_pa"] = kappa_pa
     main_dict["kappa_pv"] = kappa_pv
-    main_dict["kappa_pc"] = kappa_pc  
+    main_dict["kappa_pc"] = kappa_pc
     main_dict["kappa_e"] = kappa_ECS
     main_dict["lambda_pa_e_Inulin"] = lambda_pa_e_Inulin
     main_dict["lambda_pv_e_Inulin"] = lambda_pv_e_Inulin
     main_dict["lambda_pc_e_Inulin"] = lambda_pc_e_Inulin
     main_dict["tilde_gamma_pa_e_Inulin"] = tilde_gamma_pa_e_Inulin
-    main_dict["tilde_gamma_pa_e_Inulin"] = tilde_gamma_pc_e_Inulin
-    main_dict["tilde_gamma_pa_e_Inulin"] = tilde_gamma_pv_e_Inulin
-    main_dict["tilde_gamma_pa_e_Inulin"] = tilde_gamma_pa_pc_Inulin
-    main_dict["tilde_gamma_pa_e_Inulin"] = tilde_gamma_pc_pv_Inulin
-    
+    main_dict["tilde_gamma_pc_e_Inulin"] = tilde_gamma_pc_e_Inulin
+    main_dict["tilde_gamma_pv_e_Inulin"] = tilde_gamma_pv_e_Inulin
+    main_dict["tilde_gamma_pa_pc_Inulin"] = tilde_gamma_pa_pc_Inulin
+    main_dict["tilde_gamma_pc_pv_Inulin"] = tilde_gamma_pc_pv_Inulin
+
     main_dict["L_e_SAS"] = L_e_SAS
     main_dict["L_pa_SAS"] = L_pa_SAS
-    
+
     main_dict["blood_flow"] = B_blood
 
 
@@ -532,20 +532,21 @@ def compute_coefficients(type_exp):
     elif type_exp == "ECS+PVS enhanced":
         main_dict["phi_e"] = 0.23
         main_dict["kappa_e"] = kappa_ECS*5.5
-        main_dict["phi_pa"] = main_dict["phi_pa"]*4.0 
+        main_dict["phi_pa"] = main_dict["phi_pa"]*4.0
         main_dict["phi_pv"] = main_dict["phi_pv"]*4.0
         main_dict["phi_pc"] = main_dict["phi_pc"]*4.0
         main_dict["kappa_pa"] = kappa_pa*16.
         main_dict["kappa_pv"] = kappa_pv*16.
         main_dict["kappa_pc"] = kappa_pc *16.
     elif type_exp == "PVS only enhanced":
-        main_dict["phi_pa"] = main_dict["phi_pa"]*4.0 
+        main_dict["phi_pa"] = main_dict["phi_pa"]*4.0
         main_dict["phi_pv"] = main_dict["phi_pv"]*4.0
         main_dict["phi_pc"] = main_dict["phi_pc"]*4.0
         main_dict["kappa_pa"] = kappa_pa*16.
         main_dict["kappa_pv"] = kappa_pv*16.
         main_dict["kappa_pc"] = kappa_pc *16.
-        
+
     return main_dict
 
-
+if __name__ == "__main__":
+    compute_coefficients(None)
