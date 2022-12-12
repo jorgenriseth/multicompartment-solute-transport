@@ -1,0 +1,403 @@
+\documentclass{article}
+%\documentclass[draft]{article}  % Faster compilation and highlights overfull boxes.
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper,width=150mm,top=25mm,bottom=25mm]{geometry}
+
+% Various useful packages
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{placeins} % Allow FloatBarrier, for better figure control
+\usepackage{algorithm, algorithmic}  % Recommended but require additional packages
+\usepackage{siunitx}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks,
+    linkcolor={red!50!black},
+    citecolor={blue!50!black},
+    urlcolor={blue!80!black}
+}
+%%%%%%%%%%%%%%%%%%%
+% AMS Math formatting
+\usepackage{amsmath, amsthm, amssymb} 
+ % See amsthm documentation for various theorem styles.
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}{Corollary}[theorem]  % Number corollarys per theorem
+\newtheorem{lemma}[theorem]{Lemma}          % Lemmas use same counter as theorems
+
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}                % Remarks not using counters.
+
+\usepackage{mathtools}
+\mathtoolsset{showonlyrefs=true}
+%%%%%%%%%%%%%%%%%%%
+\usepackage[dvipsnames]{xcolor}
+\newcommand{\TODO}[1]{\textcolor{blue}{TODO: #1}}
+\newcommand{\MISSING}[1]{\textcolor{OliveGreen}{MISSING: #1}}
+\newcommand{\ISSUE}[1]{\textcolor{red}{POTENTIAL ERROR: #1}}
+
+\newcommand{\AP}[1]{\textcolor{cyan}{Alexandre: #1}}
+\newcommand{\JR}[1]{\textcolor{Fuchsia}{Jørgen: #1}}
+
+
+% Reference management. See JabRef to manage references.
+\usepackage{biblatex}
+\addbibresource{references.bib}
+
+% Add figure path
+\graphicspath{{figures/}}
+
+\title{Multinetwork Parameter Estimation}
+\author{Jørgen Riseth}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+This note is an attempt to create a short-form, but very explicit description of how all of the parameters in the multi-compartment model is found. The main intention is to highlight potential issues with the parameter values or the description of how these are found. Distributed throughout the note there are a few comments for parameters values that I couldn't find, or places where I think there might be issues with the computations. I've based these formulas on a combination of an old python script \texttt{coefficients\_computation.py} found in a Dropbox folder, and the formulas I've found in the article. For each parameter, the bullet-points represent values that are found in literature or assumed to be true. Other parameter values should be derived from these.
+
+Based on the formulas here, I've created a notebook where I've attempted to compute each of the parameters, and I find that there is an offset for a few of them,  especially convective fluid transfer $ \gamma_{i,j}$, permeability of blood compartments $\kappa_i$ and 
+\begin{itemize}
+    \item \href{https://github.com/jorgenriseth/multicompartment-solute-transport/blob/main/notes-and-notebooks/ParameterNotebook.html}{Parameter Computation Notebook (html)}
+    \item \href{https://github.com/jorgenriseth/multicompartment-solute-transport/blob/main/notes-and-notebooks/Parameters.ipynb}{Parameter Computation Notebook (ipynb)}
+\end{itemize}
+
+It seems to me that the main origins of the issues here are 
+\begin{enumerate}
+    \item There is a mismatch between fluid transfer coefficients $\gamma_{i,j}$ reported within the article itself, and the ones reported in the appendix. This seems to be related to either a) the use of two different formulas for computing hydraulic resistances, or b) some mixup in the use of parameter values for humans vs rodents.
+    \item There seems to be some missing information on some of the parameters related to boundary pressure are coming from. If this is due to some numerical issues, should we at least report this?
+\end{enumerate}
+
+\section{Introduction}
+\begin{equation}
+    \left\{
+    \begin{aligned}
+        -  \nabla\cdot( \frac{\kappa_j}{\phi_j \mu_j} \nabla p_j) &= r_j,\\ 
+        \frac{\partial c_j}{\partial t} - \frac{ \kappa_j}{\phi_j \mu_j}\nabla \cdot \left( c_j \nabla p_j\right)  - D_j^* \Delta c_j &= s_j.
+    \end{aligned}
+    \right.
+    \label{eq:main-system}
+\end{equation}
+
+\paragraph{Notation/Subsets}
+\begin{itemize}
+    \item \( \mathcal{J} = \{e, pa, pc, pv, a, c, v\} \): Set of all compartments.
+    \item \( \mathcal{B} = \{a, c, v\} \): Vascular compartments.
+    \item \( \mathcal{PV} = \{pa, pc, pv\} \): Paravascular compartments.
+    \item \( \mathcal{BBB} = \{(pa, a), (pc, c), (pv, v) \} \): Blood-brain-barrier i.e. membrane between vascular and paravascular compartments.
+    \item \( \mathcal{AEF} = \{(e, pa), (e, pc), (e, pv) \} \): Astrocytic endfeet, i.e. membrane between paravascular compartments and the ecs.
+\end{itemize}
+
+\subsubsection*{Porosity coefficients}
+\begin{itemize}
+    \item $\phi_e$: Porosity of extracellular space.
+    \item $\phi_\mathcal{B} = \frac{V_\mathcal{B}}{\left|\Omega\right|}$: Porosity/volume fraction occupied by blood compartments. 
+    \item $\phi_\mathcal{PV} = \frac{V_\mathcal{PV}}{\left|\Omega\right|}$: Porosity/volume fraction occupied by paravascular compartments. 
+    \item  $ \frac{\phi_a}{\phi_{\mathcal{B}}} = 0.2, \, \frac{\phi_c}{\phi_{\mathcal{B}}} = 0.1, \, \frac{\phi_v}{\phi_{\mathcal{B}}} = 0.7, $: Fraction of the total  blood volume occupied by each of the different vascular compartments.
+\end{itemize}
+
+\begin{equation}
+    \phi_{v_i} = \frac{\phi_{v_i}}{\phi_{\mathcal{B}}} \phi_{\mathcal{B}} \quad \phi_{pv_i} = \frac{\phi_{v_i}}{\phi_{\mathcal{B}}} \phi_{\mathcal{PV}}, \quad (pv_i, v_i) \in \{(pa, a), (pc, c), (pv, v)\}
+    \label{eq: porosities}
+\end{equation}
+
+\subsubsection*{Permeability}
+\begin{itemize}
+    \item $\kappa_e$: Permeability of the extracellular space.
+    \item $R_j, \, j \in \mathcal{PV}$:  Resistance within paravascular compartments.
+    \item $\mu_j$: Viscosity of compartment $j$.
+    \item $ Q_{\text{blood}}$: Blood flow between connected blood compartments.
+    \item \( \Delta p_{v_i, v_j}, \, (v_i, v_j) \in \{(a, c), (c, v) \} \): Pressure drop between various blood compartments. \ISSUE{Should verify that we use the same pressure values here, as the ones used below for convective fluid transfer (think this was pointed out by a reviewer).}
+    \item \( \Delta p_{c_\text{prox}, c_\text{dist}} \): Pressure drop between distal and proximal capillariese
+\end{itemize}
+
+\begin{equation}
+    \kappa_j = \frac{\mu_j}{R_j} \left(\frac{L}{A}\right), \quad j\in \mathcal{B} \cup \mathcal{PV}
+\label{eq: permeabilities} 
+\end{equation}
+
+\begin{equation}
+    \left(\frac{L}{A}\right) = \frac{R_e \kappa_e}{\mu_e}
+\label{eq: homogenization length/area relation} 
+\end{equation}
+Resistances within vascular compartments computed as (slight abuse of notation for capillaries):
+\ISSUE{ Possibly missing \( \lvert \Omega \rvert \) here?}
+\AP{It seems that the units are correct for this equation. However, multiplying or dividing by the volume $|\Omega|$ does not give the correct unit for the permeability ie $mm^2$.}
+\JR{Makes sense. Just wondering since the expression for fluid transfer for connected components does not include the volume, whereas the membrane interfaces does, so I thought it might be located here. \eqref{eq: convective fluid transfer connected}}
+
+\begin{equation}
+    R_{v_{i}} = \frac{\Delta p_{v_i, v_j}}{Q_{\text{blood}}}, \quad (v_i, v_j) = \{(a, c), (c, v), (c_\text{prox}, c_\text{dist})\}
+\label{eq: resistance vascular} 
+\end{equation}
+
+
+\subsubsection*{Effective Diffusion Coefficient}
+\begin{itemize}
+    \item \( D_{\text{free}} \): Free diffusion coefficient (of inulin).
+    \item \( \lambda_j, \quad j \in \{e \} \cup \mathcal{PV} \): Compartment tortuosity (assumed the same in pvs as ecs)
+\end{itemize}
+
+\begin{equation}
+    D_j^* = \frac{D_{\text{free}}}{\lambda_j^2}, \quad j \in \{e \} \cup \mathcal{PV} 
+\label{eq: effective diffusion} 
+\end{equation}
+
+
+\subsection*{Fluid Transfer Coefficients}
+\begin{equation}
+    r_j = \frac{1}{\phi_j}\sum_{i\in J, i\neq j} \gamma_{j , i} \left[(p_i - p_j)-\sigma_{i,j}(\pi_i-\pi_j)\right],
+\end{equation} 
+
+\subsubsection*{Convective Fluid Transfer \( \gamma_{i, j} \)}
+\begin{itemize}
+    \item $L_{e, v_i}, \, v_i\in\mathcal{B}$: Hydraulic permeability between extracellular space and the blood compartments. 
+    \item $\frac{S_{v_i}}{\left| \Omega \right|}, \, v_i \in \mathcal{B}$: Ratio between surface area of blood compartments \( v_i \) and the total brain volume.
+    \item \( R_{i, j}, \, (i, j) \in \{(e, pa), (e, pv), (e, pc)\} \): Membrane resistance between extracellular space and different paravascular compartments. \ISSUE{See point 1. in description below}
+    \item $Q_{v_i, v_j}, \, (v_i, v_j) \in \{(a, c), (c, v)\}$: Blood flow between connected blood compartments.
+    \item $Q_{pv_i, pv_j}, \, (pv_i, pv_j) \in \{(pa, pc), (pc, pv) \}$: CSF flow between connected paravascular compartments.
+    \item $\lvert \Delta p_{i, j} \rvert, (i, j) \in \{(pa, pc), (pc, pv), (a, c), (c, v)\}$: Pressure drop between connected compartments.
+\end{itemize}
+
+\begin{equation}
+    S_{e, pv_i} = S_{pv_i, v_i} = S_{v_i}
+\label{eq: surface area approximation} 
+\end{equation}
+
+\begin{equation}
+    \gamma_{e, v_i}^* = L_{e, v_i} \frac{S_{e, v_i}}{\left|\Omega\right|}, \quad v_i \in \mathcal{B} 
+\label{eq: total blood to ecs transfer} 
+\end{equation}
+
+\begin{equation}
+    \gamma_{i, j} = \frac{1}{R_{i, j} \left|\Omega\right|}, \quad (i, j) \in \left\{(e, pa), (e, pc), (e, pv), (pa, a), (pc, c), (pv, v)\right\}
+\label{eq: partial fluid transfer}
+\end{equation}
+\ISSUE{Change the relevant set of triples if we switch the relevant membrane of \( R_{cap} \) according to point 1. below.}.
+\begin{equation}
+    R_{i, j} = \left(\frac{1}{\gamma_{k, j}^*\left|\Omega\right|} - R_{k, j}\right), \quad (i, j, k) \in \{(pa, a, e), (pc, c, e), (pv, v, e)\}
+\label{eq: partial fluid resistances} 
+\end{equation}
+
+\begin{equation}
+    L_{c, pc} = \frac{1}{\pi R_{AEF} d_c}, \quad R_{AEF} = 3 \frac{\mu_{\text{CSF}} \ell_{AEF}}{2r_{p}^{AEF}}
+\label{eq: hydraulic conductivity capillary level} 
+\end{equation}
+\ISSUE{ Possibly missing \( \lvert \Omega \rvert \) here?}
+\begin{equation}
+    \gamma_{i, j} = \frac{Q_{i, j}}{\lvert \Delta p_{i, j} \rvert}, \, (i, j) \in \{(a, c), (c, v), (pa, pc), (pc, pv)\}
+\label{eq: convective fluid transfer connected} 
+\end{equation}
+
+\ISSUE{
+    Since the hydraulic conductivities found in the literature are given as the total conductivity between the vascular compartments and the ECS, we have to estimate the partial transfer terms across the BBB and the AEF. This is done using \eqref{eq: partial fluid transfer}, which in turn means that we need the membrane resistances \( R_{i, j} \) between relevant compartments. Given one of the partial resistances (e.g. \( R_{e, pa} \)), we may compute the corresponding resistance (e.g.  \( R_{pa, a}\) ) according to \eqref{eq: partial fluid resistances}. I have two issues related to the capillary transfer:
+    \begin{enumerate}
+        \item From what I've found in old python scripts, we've assumed that the resistances given in Vegards "Intracranial pressure alters CSF flow (or whatever its called)"  are given between the ECS and each of the paravascular compartments. This seems correct for arteries and veins. However, I think that \( R_{cap} \) given in the paper, is rather the resistance between pvs capillaries and capillaries.
+        \item Independently of whether the reported resistance is used for \( R_{e, pc} \) or for \( R_{pc, c} \), then we should be able to find both of the corresponding transfer coefficients in the same manner as we do for membranes on the arterial and venous level. However, we seem to be using \eqref{eq: hydraulic conductivity capillary level} together with \eqref{eq: total blood to ecs transfer}  to find \( \gamma_{c, pc} \), but still use \eqref{eq: partial fluid transfer} for \( \gamma_{e, pc} \). I suggest that we either (a) use a \( R_{\text{AEF}} \) given in \eqref{eq: hydraulic conductivity capillary level} as \( R_{e, pc} \) and estimate \( R_{pc, c} \) from this, or (b), that we avoid the use of \eqref{eq: hydraulic conductivity capillary level} altogheter.
+        \item I see that the values for transfer coefficients are reported both within the article, AND within the appendix, but with differing values. This difference may be attributed both to point 2., with two different ways of computing the values, or to the difference between using human vs. rat parameters (I see that e.g. the blood flow used is significantly different.). Moreover, I see that for connected compartments, transfer formula included division by \( \lvert \Omega \rvert \) in one location but not in the other.
+\end{enumerate}}
+
+\AP{Answers to the points above: \begin{enumerate}
+    \item .
+    \item .
+    \item After reviewing the coefficients values in both parts, the values and computations in the main body are correct. I will change the appendix after I double check but the values are in the main body for the rat and the units are correct there (which is not the case in the appendix). 
+\end{enumerate}}
+
+\subsubsection*{Osmotic Transfer Coefficients}
+\begin{itemize}
+    \item $\pi_\mathcal{B}$: Osmotic pressure in blood compartments. 
+    \item $\frac{\pi_{CSF}}{\pi_{\mathcal{B}}} = \frac{1}{5}$: Relative osmotic pressure of CSF compared to blood.
+    \item $\sigma_{i, j}^{\text{Inulin}} = 0.2, \, (i, j) \in \mathcal{AEF}\cup\mathcal{BBB}$: Osmotic reflection coefficient of Inulin for membrane interfaces.
+        \TODO{Verify that the sigma appearing in the pressure equations and in the convective solute transport (reflect) is the same. (i.e. \( \sigma_{i,j} =^? \sigma^{Inulin}_{ij, reflect} \)). If not, then the sigma used in the pressure equation is not stated anywhere. However, the pressure equations should seemingly be independent from the chosen solute (shouldn't it?), so I think one value is missing here.}
+    \item $\sigma_{i, j}^{\text{Inulin}} = 0, \, (i, j) \in \{(a, c), (c, v), (pa, pc), (pc, pv)\} $: Osmotic reflection coefficient of Inulin between connected compartments.
+\end{itemize}
+\begin{equation}
+    \pi_{v_i} = \pi_\mathcal{B}, \, v_i \in \mathcal{B}, \quad \pi_{i} = \frac{\pi_\text{CSF}}{\pi_\mathcal{B}}\pi_{\mathcal{B}}, \, i \in \{e\} \cup \mathcal{PV} 
+\label{eq: osmotic pressures} 
+\end{equation}
+
+
+\subsection*{Solute Transfer Coefficients}
+\begin{equation}
+    s_j = \frac{1}{\phi_j}  \sum_{i\in J, i\neq j}\lambda_{j , i} ( c_i- c_j) +  \frac{(c_j+c_i)}{2} \tilde \gamma_{j , i} (p_i - p_j-\sigma_{i,j}(\pi_i-\pi_j)) ,
+\end{equation}
+
+\subsubsection*{Convective Solute Transfer}
+\begin{itemize}
+    \item $\gamma_{i,j} $: Convective fluid transfer computed above.
+    \item $\sigma_{i, j}^{\text{Inulin}} = 0.2, \, (i, j) \in \mathcal{AEF}\cup\mathcal{BBB}$: Osmotic reflection coefficient of Inulin for membrane interfaces.
+        \TODO{Se point under osmotic transfer coefficients.}
+    \item $\sigma_{i, j}^{\text{Inulin}} = 0, \, (i, j) \in \{(a, c), (c, v), (pa, pc), (pc, pv)\} $: Osmotic reflection coefficient of Inulin between connected compartments.
+\end{itemize}
+\begin{equation}
+    \tilde\gamma_{i, j}^\alpha = \gamma_{i, j}\left(1 - \sigma^\alpha_{i, j}\right)
+\end{equation}
+
+\subsubsection*{Diffusive Transfer Coefficients}
+Currently only interested in paravascular to extracellular transfer, as Inulin does not pass the inner layers of the BBB.
+\begin{itemize}
+    \item $P^\text{Inulin}_{pv_i, v_i} = 0, \, (pv_i, v_i) \in \mathcal{BBB}$: Permeability of blood brain barrier, i.e. vascular to paravascular interfaces.
+    \item $d_{v_i}, \, v_i \in \mathcal{B}$: Diameter of vessels in the different vascular compartements.
+    \item $\ell_{\text{AEF}_{v_i}}, \, v_i \in \mathcal{B} $: Thickness of astrocytic endfeet layer surrounding vasculature at different levels.
+    \item $ B_{\text{AEF}_{v_i}}, \, v_i \in \mathcal{B}$: Half-width of inter-endfeet gaps of astrocytic endfeet layer surrounding vasculature at different levels.
+    \item $a^\alpha$: Molecule radius for solute \( \alpha \) .
+\end{itemize}
+
+\begin{equation}
+    d_{pv_i} = d_{v_i}, \, (pv_i, v_i) \in \mathcal{BBB}
+\label{eq: paravascular diameter} 
+\end{equation}
+
+\begin{equation}
+    \lambda_{i, j} = P^\alpha_{i, j} \frac{S_{i, j}}{\lvert \Omega \rvert}, \, (i, j) \in \mathcal{BBB} \cup \mathcal{AEF}
+\label{eq: diffusive transfer coefficient} 
+\end{equation}
+
+
+
+\begin{equation}
+    P^\alpha_{e, pv_i} = \frac{1}{\pi d_{pv_i}}\frac{1}{R^\alpha_{e, pv_i}}, \quad (e, pv_i) \in \mathcal{AEF}
+\label{eq: diffusive permeability aef} 
+\end{equation}
+
+\begin{equation}
+    R^\alpha_{e, pv_i} = \frac{\ell_{AEF_{v_i}}}{2B_{\text{AEF}_{v_i}} D^\alpha_{AEF_{v_i}}}
+\end{equation}
+
+\begin{equation}
+    \begin{cases}
+    D^\alpha_\text{AEF} = D^\alpha_\text{free}\left(1-2.10444\beta +2.08877\beta^3 - 0.094813\beta^5 - 1.372\beta^6 \right),\\
+    \alpha = \frac{a^\alpha}{B_\text{AEF}},
+    \end{cases}
+\end{equation}
+
+
+\subsubsection*{For solutes which permeates BBB (Not yet relevant)}
+\begin{equation}
+    \Lambda_{i, j}: \text{Set of layers making up the membranes of an interface.}
+\label{eq: layer set} 
+\end{equation}
+
+\begin{equation}
+R^\alpha_{\lambda, v_i} = \frac{\ell_{v_i, \lambda}}{2 r_{\lambda, v_i} D^\alpha_{\lambda}}
+\end{equation}
+
+\ISSUE{Please correct me if I've misunderstood, but I think the summation term is placed the wrong place in the article. (not important as we're only dealing with single-layers).}
+\begin{equation}
+    P^\alpha_{i, j} = \frac{1}{\pi d_{i}} \frac{1}{R^\alpha_{i, j}}, \quad R_{i, j}^\alpha=\sum_{\lambda \in \Lambda_{v_i}} R_{\lambda, v_i}
+\label{eq: convective solute transfer} 
+\end{equation}
+
+\subsection*{Boundary Conditions}
+
+\subsubsection*{Pressure}
+Here I've used a different notation than in the paper, to signify which compartment the given boundary condition is relevant for (e.g. \( L_{\partial\Omega_a} \) instead of \( L_{a, blood} \), or \( p_{\partial\Omega_{pa}} \)instead of $p_{\text{PVSpial}}$ ).
+\begin{equation}
+    \left\{
+    \begin{aligned}
+        - \frac{\kappa_j}{\mu_j} \nabla p_j \cdot \mathbf{n} &= L_{\partial \Omega_j} (p_{\partial \Omega_j} - p_j\vert_{\partial\Omega}) && j \in \{e, a, pa\} \\
+        - \frac{\kappa_j}{\mu_j} \nabla p_j \cdot \mathbf{n} &= 0 && j \in \{c, pc\} \\ 
+        p_j \vert_{\partial \Omega} &= p_{\partial \Omega_j} && j \in  \{v, pv\}
+    \end{aligned}
+\right.
+\label{eq: boundary conditions}
+\end{equation}
+
+\begin{itemize}
+    %\item $L_{\partial\Omega_j},\, j\in \{e, pa, a\}$: Hydraulic conductivity (?) of membrane separating the given compartment from whatever is directly outside of the boundaries ( \( L_{\text{PVSpial}, pa \), etc...)
+    \item $p_{\partial\Omega_j},\, j\in \{e, pa, pv, a, v\}$: Pressure in the surroundings of each of the boundary, i.e. Whatever they are in communication with at the boundary.
+    \item $R_{pa}$: Resistance coefficient of para-arterial space.
+    \item \( \lvert S_{\text{human}} \rvert \): Pial surface area of a human brain (does this differ from the brain surface area, and if not, may we use it for both paraarterial and extracellular boundary?
+\end{itemize}
+
+\MISSING{
+    \begin{itemize}
+        \item \( L_{\partial\Omega_a} (=L_{a, blood} )  \): Boundary conductivity for arteries. Chosen due to numerical issues, or computed from the below formula for \( L_{\partial\Omega_{j}} \) with resistance \( R_a \) for the arterial compartment?
+        \item \( R_{\partial\Omega_{pa}} \): Resistance at boundary for para-arterial space. Using \( R_{pa} \) gives a different result than reported in paper. Potentially related to:
+    \begin{itemize}
+        \item $Q_{e, pv_i}$: CSF flow from extracellular space to paravascular space.
+        \item $Q_{\text{SAS}, i}, \, i \in \{e, pa, pv\}$: CSF flow between SAS/boundary pressure.
+    \end{itemize}
+    \end{itemize}
+}
+\ISSUE{
+\begin{itemize}
+    \item Differing Notation: Is \( L_{PVSpial, pa} \) (used in section 2.2 on boundary conditions) and $L_{pa, SAS}$ given in the appendix the same?
+    \item How is $L_{a, blood}$ computed? Does it use the same method as for connected components.
+\end{itemize}
+} 
+
+\begin{equation}
+    L_{\partial\Omega_j} = \frac{1}{R_{\partial\Omega_j} \lvert S_{\text{human}} \rvert}
+\end{equation}
+
+\begin{equation}
+    R_{\partial\Omega_e} =  2 \times R_{pa}
+\label{eq: surface resistance ecs} 
+\end{equation}
+
+\begin{equation}
+  R_{\partial\Omega_{pa}} = ?
+\end{equation}
+
+\subsubsection*{Solutes}
+\begin{equation*}
+    \left\{
+    \begin{aligned}
+        c_j \big|_{\partial \Omega} &=  g(t), && j\in\{pa,pv,e \}, \label{eq:Dirichlet} \\
+        \frac{\partial\left( D_j \nabla c_j + \frac{\kappa_j}{\mu_j}c_j \nabla p_j\right)}{\partial \nu}  &= 0 && j \in \{pc\}.
+    \end{aligned}
+    \right.
+\end{equation*}
+\begin{itemize}
+    \item \( \alpha \): CSF renewal/absorption rate.
+    \item \( V_{\text{CSF}} \): Total CSF volume in SAS + ventricles. 
+        \item (Alternatively) \( \frac{V_{\text{CSF}}}{\lvert \Omega \rvert}\): Ratio between CSF volume and brain volume. 
+\end{itemize}
+Either \( g \equiv 0 \) or \( g \) satisfies
+\begin{equation}
+    \left\{
+    \begin{aligned}
+        \frac{dg}{dt} &= - \alpha g(t)  + \frac{1}{V_\text{CSF}} \int_{\partial \Omega}  \mathbf{q} \cdot\pmb{\nu}\,ds, \\
+        g(0) &= 0,
+    \end{aligned}
+    \right.
+\end{equation}
+with \( \alpha \) potentially 0.
+
+
+%\centering
+%\begin{tabular}{ c c c }
+    %\hline
+    %Parameter & Paper & Computed \\
+    %\hline 
+    %\( p_\text{PVSpial} \) & 4.74 \si{mmHg} & \\
+    %\(p_{\text{SAS}} \) & 3.74\si{mmHg} & \\
+    %\(p_{pv}\vert_{\partial \Omega} \) & 3.36 \si{mmHg} &\\
+    %\(p_{blood}\) & 120 \si{mmHg} & \\
+    %\(p_v\vert_{\partial\Omega} \)& 7.0 \si{mmHg} & \\
+    %$D^{Inulin}_{free}$ & $2.98\times 10^{-4} \si{mm^2/s}& \\
+    %$\lambda$ & 1.7& \\
+    %\( D^* \) & \( 1.03\times 10^{-4} \si{mm^2/s} \) & \\
+    %\( \phi_e \) & 0.14 & \\
+    %\( \phi_\mathcal{B} \) & 0.0329 & \\
+    %\( \phi_{\mathcal{PV}}\) & 0.003 & \\
+    %\( \phi_{a} \) & 0.00658 & \\
+    %\( \phi_{c} \) & 0.00329 & \\
+    %\( \phi_{v} \) & 0.02303 & \\
+    %\( \phi_{pa} \) & 0.0006 & \\
+    %\( \phi_{pc} \) & 0.0003 & \\
+    %\( \phi_{pv} \) & 0.0021 & \\
+%\end{tabular}
+
+%\clearpage                                 % Move references to separate page?
+% Insert bibliography
+\emergencystretch=1em                       % Allow slight overfull hbox in bibliography
+\printbibliography
+\emergencystretch=0em                       % And reset for appendix
+
+\end{document}

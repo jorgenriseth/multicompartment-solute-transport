@@ -1,0 +1,106 @@
+\documentclass {letter}
+	\usepackage{color,amsmath,amssymb}
+	\usepackage{enumitem}
+	\usepackage[a4paper, total={6in, 8in}]{geometry}
+	\usepackage[dvipsnames]{xcolor}
+	\newcounter{mycounter} 
+	\usepackage{ulem}
+	\usepackage{hyperref}
+\newenvironment{noindlist}
+ {\begin{list}{\arabic{mycounter}.~~}{\usecounter{mycounter} \labelsep=0em \labelwidth=0em \leftmargin=0em \itemindent=0em}}
+ {\end{list}}
+ \makeatletter
+\newenvironment{thebibliography}[1]
+     {\list{\@biblabel{\@arabic\c@enumiv}}%
+           {\settowidth\labelwidth{\@biblabel{#1}}%
+            \leftmargin\labelwidth
+            \advance\leftmargin\labelsep
+            \usecounter{enumiv}%
+            \let\p@enumiv\@empty
+            \renewcommand\theenumiv{\@arabic\c@enumiv}}%
+      \sloppy
+      \clubpenalty4000
+      \@clubpenalty \clubpenalty
+      \widowpenalty4000%
+      \sfcode`\.\@m}
+     {\def\@noitemerr
+       {\@latex@warning{Empty `thebibliography' environment}}%
+      \endlist}
+\newcommand\newblock{\hskip .11em\@plus.33em\@minus.07em}
+\makeatother
+
+ \newcommand{\AP}[1]{{\textcolor{blue}{#1}}}
+
+ \begin{document}
+   \begin{letter}{ }
+       \opening{ }
+
+       
+       \begin{center}
+\noindent\textbf{Re:}  \textit{Manuscript PONE-D-22-27008} \\
+Title: \textit{Multi-compartmental model of glymphatic clearance of solutes in brain tissue}
+\end{center}
+
+       Dear Editor-in-Chief,\\
+       
+Thank you for considering our manuscript for possible publication in  {\it PLOS ONE}. \\
+
+
+We are very grateful to the reviewers for the careful reading of the article and constructive comments. 
+
+
+
+We are pleased to submit a revised version that addresses the reviewers' comments. 
+The corrections in this new manuscript are highlighted in blue. 
+Please find below a detailed answer to the reviewers' comments.  
+
+
+
+\noindent
+Thank you very much for handling the manuscript.
+
+Yours sincerely,
+\\
+
+\begin{flushright}
+    Alexandre Poulain, Jørgen Riseth, and Vegard Vinje.
+\end{flushright}
+\newpage
+
+
+\begin{center}
+\textit{Multi-compartmental model of glymphatic clearance of solutes in brain tissue} \\
+by Alexandre Poulain, Jørgen Riseth, and Vegard Vinje.
+\end{center}
+\vspace{0.3cm}
+
+\centerline{\textbf{Response of the authors to the Reviewers}}
+
+Dear reviewers, 
+
+Thank you very much for your helpful comments, corrections, and remarks!
+
+We highlight the changes in the manuscript in blue and give a detailed answer below. We also updated the references.
+
+\bigskip
+\textbf{Reviewer 1:}
+General comments: 
+\begin{itemize}
+    \item 
+\end{itemize}
+
+Specific comments:
+\begin{itemize}
+    \item "Abstract: Don’t capitalize glymphatic or biology.": Corrected.
+    \item "Page 2, par. 1: Reference 60 also argues that transport in the ECS is not by diffusion alone. Further theoretical evidence in favor of a flow of ISF in the ECS, based on the sleep/wake variation in clearance, is given in Thomas 2022, FBCNS 19:30." : The reference has been added.  
+    \item "Page 2, first two paragraphs: Fluid dynamic models, and in particular, previous compartment models, of CSF flow and transport are discussed in a very recent review article, Kelley and Thomas 2023, Annual Review of Fluid Dynamics, pre-publication version available online." Thank you for this information, the reference has been added. 
+    \item "Page 3, Remark 1: The correct term here is “homogeneous”, not “isotropic”. Isotropic means independent of direction, and you have already assumed isotropy by assume scalar, rather than tensor, permeability, etc.": Corrected.
+    \item "Page 7, section 2.3.2, Porosity coefficients: For the mouse brain, although the porosity of PVSs around penetrating arteries and arterioles is unknown, the PVSs around pial arteries have been shown to be essentially open spaces (Min Rivas et al. 2020, J. Roy. Soc. Interface, 17: 20200593), i.e., porosity = 1. Assuming this is also true in the rat brain, can you account for this in your model?": Our model results from homogenisation. Assuming open spaces for the penetrating PVSs will result in Stokes flow inside the PVS. After homogenization, this turns into porous medium type flow. The precise derivation of the model using homogenisation in a possible deformable medium will be the subject of a forthcoming paper. 
+    \item "Page 10, Remark 3: “precised”? Do you mean “specified”?": corrected
+    \item "Page 10, The effect of sleep: The effect of sleep/wake variations in permeability is discussed in Thomas 2022, cited above." Already cited in the paragraph. 
+    \item "Page 13, Table 3 and text: Here you might want to compare with the flow speeds in pial PVSs in the mouse brain, measured by particle tracking in Mestre et al. 2018 (your reference 47). They are comparable to your values." Thank you for this remark. This has been now added. 
+\end{itemize}
+
+\end{letter}
+\end{document}
+
