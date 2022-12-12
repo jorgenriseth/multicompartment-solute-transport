@@ -31,8 +31,9 @@ from ts_storage import TimeSeriesStorage
 from pathlib import Path
 import matplotlib.pyplot as plt
 import sys
+from compute_coefficients import compute_coefficients
 
-model = 7   # 4 comp or 7 comp
+model = 4   # 4 comp or 7 comp
 
 k_e_factor = float(sys.argv[1])
 k_pa_factor = float(sys.argv[2])
@@ -43,7 +44,7 @@ gamma_paa_factor = float(sys.argv[6])
 D_factor = float(sys.argv[7])
 phi_pa_factor = float(sys.argv[8])
 p_dict = {'k_e':k_e_factor, 'k_pa':k_pa_factor, 'k_pc':k_pc_factor, 'pCSF':pCSF_factor, 'p_ae_diff':p_ae_diff_factor, 'gamma_paa':gamma_paa_factor, 'D':D_factor, 'phi_pa':phi_pa_factor}
-
+d = compute_coefficients(None)
 # Choose Boundary type
 #BC_type = "Homogeneous"
 #BC_type = "Conservation"  # You have three choices: Conservation, Homogeneous, Decay
@@ -106,41 +107,41 @@ n = FacetNormal(mesh)
 ###  PHYSICAL PARAMETERS
 # porosity
 phi0 = ncomp*[Constant(5e-8)]  # Porosity V_i/V_Total
-phi0[0] = 0.14
-phi0[1] = 0.00658
-phi0[2] = 0.02303
-phi0[3] = 0.00329
-phi0[4] = 6.e-4*phi_pa_factor
-phi0[5] = 2.1e-3
-phi0[6] = 3.e-4
+phi0[0] = d['phi_e']
+phi0[1] = d['phi_a']
+phi0[2] = d['phi_v']
+phi0[3] = d['phi_c']
+phi0[4] = d['phi_pa']*phi_pa_factor
+phi0[5] = d['phi_pv']
+phi0[6] = d['phi_pc']
 
 
 # viscosity
 nu = np.array([0.0]*ncomp)
-nu[0] = 7.0e-4
-nu[1] = 2.67e-3 # blood viscosity
-nu[2] = 2.67e-3
-nu[3] = 2.67e-3
-nu[4] = 7.0e-4
-nu[5] = 7.0e-4
-nu[6] = 7.0e-4
+nu[0] = d['mu_csf']
+nu[1] = d['mu_blood'] # blood viscosity
+nu[2] = d['mu_blood']
+nu[3] = d['mu_blood']
+nu[4] = d['mu_csf']
+nu[5] = d['mu_csf']
+nu[6] = d['mu_csf']
 
 # Permeability of fluid
 kappa_f = np.array([0.0]*ncomp)
-kappa_f[0] = 2.0e-11*k_e_factor
-kappa_f[1] = 3.29478e-06
-kappa_f[2] = 6.58956e-06
-kappa_f[3] = 8.811e-09
-kappa_f[4] = 1.0e-11*k_pa_factor
-kappa_f[5] = 6.514285714285714e-09
-kappa_f[6] = 3.5359801488833745e-13*k_pc_factor
+kappa_f[0] = d['kappa_e']*k_e_factor
+kappa_f[1] = d['kappa_a']
+kappa_f[2] = d['kappa_v']
+kappa_f[3] = d['kappa_c']
+kappa_f[4] = d['kappa_pa']*k_pa_factor
+kappa_f[5] = d['kappa_pv']
+kappa_f[6] = d['kappa_pc']*k_pc_factor
 
 
 # transfer coefficients
 
-w_apa = 5.89e-09*gamma_paa_factor
-w_vpv = 1.26e-10
-w_cpc = 2.98e-09
+w_apa = d['gamma_a_pa']*gamma_paa_factor
+w_vpv = d['gamma_v_pv']
+w_cpc = d['gamma_c_pc']
 
 
 # WARNING: Comment the floowing 3 lines to have 7 compartments
@@ -150,14 +151,14 @@ if model == 4:
     w_vpv = 0
     w_cpc = 0
 
-w_pae = 2.1932017763179826e-07#*pvsc_ECS_transfer_factor
-w_pve = 1.9533203320332029e-07
-w_pce = 9.976258977745193e-10
+w_pae = d['gamma_pa_e']
+w_pve = d['gamma_pv_e']
+w_pce = d['gamma_pc_e']
 
-w_ac = 3.137483804633168e-06
-w_cv = 9.653796321948209e-06
-w_papc = 1.8283957344241566e-07
-w_pcpv = 7.313582937696626e-07
+w_ac = d['gamma_a_c']
+w_cv = d['gamma_c_v']
+w_papc = d['gamma_pa_pc']
+w_pcpv = d['gamma_pc_pv']
 
 # Fluid pressure exchange
 gamma = np.array([[0,0,0,0,w_pae,w_pve, w_pce],
@@ -186,11 +187,15 @@ for i in range(ncomp):
                         F -=  Constant(gamma[i][j])*inner(p[j]-p[i]-(osmo[j]-osmo[i]),q[i])*dx
 
 # Boundary conditions
-F -= 1/(0.01*133.32*60.0/1000.0*1.0e6)*(120.0*133.33*q[1]*ds - p[1]*q[1]*ds)
-F -= (3.13e-7)*(3.26*133.33*q[0]*ds - p[0]*q[0]*ds)
+blood_flow = d['blood_flow']                        # mm³/sec, cerebral blood flow
 
+b_avg = blood_flow/surface_area #
+b_in = Constant(b_avg)
+F -= b_in*q[1]*ds
+
+F -= d['L_e_SAS']*(3.26*133.33*q[0]*ds - p[0]*q[0]*ds)
 p_CSF = 4.74*133.333*pCSF_factor
-F -= (1.25e-6)*(p_CSF*q[4]*ds - p[4]*q[4]*ds)
+F -= d['L_pa_SAS']*(p_CSF*q[4]*ds - p[4]*q[4]*ds)
 
 bcs = [DirichletBC(Q.sub(2), Constant(7.0*133.33), 'on_boundary'),DirichletBC(Q.sub(5), Constant(3.26*133.33), 'on_boundary')]
 
@@ -250,9 +255,9 @@ g_cv = w_pcpv
 gamma_tilde = np.array([[0,g_ae,g_ve,g_ce],[g_ae,0,0,g_ac],[g_ve,0,0,g_cv],[g_ce,g_ac,g_cv,0]])
 
 # From diffusion
-l_ae = 3.744331208456129e-05*p_ae_diff_factor
-l_ce = 1.7198523872626686e-05
-l_ve = 3.744331208456129e-05
+l_ae = d['lambda_pa_e_Inulin']*p_ae_diff_factor
+l_ce = d['lambda_pc_e_Inulin']
+l_ve = d['lambda_pv_e_Inulin']
 l_ac = 0
 l_cv = 0
 lmbd = np.array([[0,l_ae,l_ve,l_ce],[l_ae,0,0,l_ac],[l_ve,0,0,l_cv],[l_ce,l_ac,l_cv,0]])
