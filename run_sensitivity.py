@@ -22,13 +22,13 @@ def run_sensitivity(kind='serial'):
     
     
     if kind != 'serial':
-        N = len(ecs_factor)*len(pvs_cap_factor)*len(pCSF_factor)*len(pvsc_ECS_factor)
+        params = [k_e_factor, k_pa_factor, k_pc_factor, pCSF_factor, p_ae_diff_factor, gamma_paa_factor, D_factor, phi_pa_factor]
+        N = sum([len(i) for i in params])
         for k_ecs in k_e_factor:
             for k_pa in k_pa_factor:
                 for k_pvc in k_pc_factor:
                     for p in pCSF_factor:
-                        for pae_factor in p_ae_diff_factor:
-                                 
+                        for pae_factor in p_ae_diff_factor:                                 
                             for g in pvsc_ECS_factor:
                                 print(f"Running simulation {sim_count} of of {N}")
                                 os.system(f'python3 sensitivity.py {k_ecs} {k_pvs} {p} {g}')
