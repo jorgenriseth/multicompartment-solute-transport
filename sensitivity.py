@@ -43,6 +43,7 @@ p_ae_diff_factor = float(sys.argv[5])
 gamma_paa_factor = float(sys.argv[6])
 D_factor = float(sys.argv[7])
 phi_pa_factor = float(sys.argv[8])
+model = float(sys.argv[9])
 p_dict = {'k_e':k_e_factor, 'k_pa':k_pa_factor, 'k_pc':k_pc_factor, 'pCSF':pCSF_factor, 'p_ae_diff':p_ae_diff_factor, 'gamma_paa':gamma_paa_factor, 'D':D_factor, 'phi_pa':phi_pa_factor}
 d = compute_coefficients(None)
 # Choose Boundary type
@@ -51,7 +52,7 @@ d = compute_coefficients(None)
 BC_type = "Decay"
 
 ### Temporal parameters
-dt = 200.
+dt = 60.
 T = 3600.*6
 decay = 0.01/60.
 
@@ -171,8 +172,10 @@ gamma = np.array([[0,0,0,0,w_pae,w_pve, w_pce],
 #print(gamma)
 
 osmo_cap = 20.0*133.33
-#osmo_e = 0.*osmo_cap  # If you consider the blood compartments, change this line to:
-osmo_e = 0.2*osmo_cap
+if model == 4:
+    osmo_e = 0.*osmo_cap  # If you consider the blood compartments, change this line to:
+else:
+    osmo_e = 0.2*osmo_cap
 osmo = np.array([osmo_e,osmo_cap,osmo_cap,osmo_cap,osmo_e,osmo_e,osmo_e])
 
 ### INITIAL CONDITIONS
@@ -228,7 +231,6 @@ velocities = np.array([[float(1/brain_volume*assemble(kappa_f[i]/nu[i]*dot(grad(
 # PART 2: the diffusion-convection equations
 ########
 
-ecs_permeability = float(kappa_f[6])
 ## Go to 4 compartments because we do not have transport in blood
 comp = ['IS', 'PVS arteries', 'PVS veins', 'PVS capillaries']
 ncomp = len(comp)
@@ -363,7 +365,7 @@ c1 = c_.split(True)
 
 #results_path_base = Path(f"results_sensitivity/results-{BC_type}-mesh{res}-dt{int(dt)}-inulin-{len(comp)}comps-k_e{k_e_factor:.4f}-k_pa{k_pa_factor:.4f}-k_pc{k_pc_factor:.4f}-pCSF{pCSF_factor:.4f}-p_aee_diff{p_ae_diff_factor:.4f}-gamma_paa{gamma_paa_factor:.4f}-D{D_factor:.4f}")
 
-results_path_base = f"results_sensitivity/results-{BC_type}-mesh{res}-dt{int(dt)}-inulin-{model}comps-"
+results_path_base = f"results_sensitivity_{model}_comps/results-{BC_type}-mesh{res}-dt{int(dt)}-inulin-{model}comps-"
 results_path_params = '-'.join([f'{key}{value:.4f}' for key,value in p_dict.items()])
 results_path = Path(results_path_base+results_path_params)
 results_path.mkdir(parents=True, exist_ok=True)
@@ -399,6 +401,7 @@ it =1
 transfer_arteries =  np.zeros_like(amount)
 print("solving diffusion equations")
 # Time steping
+embed()
 while t< T + dt/2: # Added dt/2 to ensure final time included.
     #print('t = ', t)
     cn.assign(c_)

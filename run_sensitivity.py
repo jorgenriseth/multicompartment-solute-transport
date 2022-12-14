@@ -2,22 +2,31 @@ import os
 import sys
 from IPython import embed
 from pylab import *
+from compute_coefficients import compute_coefficients
 
 k_e_factor = [0.1, 1.0, 10, 100, 1000]
-k_pa_factor = [0.01, 0.1, 1, 10, 100]
-k_pc_factor = [0.01, 0.1, 1.0, 10, 100]
+k_pa_factor = [0.01, 0.1, 1, 10, 100,1000]
+k_pc_factor = [0.01, 0.1, 1.0, 10, 100,1000]
 pCSF_factor = [0.5, 0.75, 1.0, 1.5, 2]
-p_ae_diff_factor = [0.01, 0.1, 1.0, 10, 100]
-gamma_paa_factor = [0.01, 0.1, 1.0, 10, 100]
+p_ae_diff_factor = [0.01, 0.1, 1.0, 10, 100,1000]
+gamma_paa_factor = [0.1, 0.5, 1.0, 2, 5]
 D_factor = [0.5, 0.75, 1.0, 1.5, 2]
-phi_pa_factor = [0.1, 1, 10, 20, 50]
-
+phi_pa_factor = [0.1, 0.5, 1, 10, 20]
+"""
+k_e_factor = [1,2]
+k_pa_factor = []
+k_pc_factor = []
+pCSF_factor = []
+p_ae_diff_factor = []
+gamma_paa_factor,D_factor,phi_pa_factor = [], [], []
+"""
+d = compute_coefficients(None)
 #k_e_factor, p_pa_factor, k_pc_factor, pCSF_factor, p_ae_diff_factor, gamma_paa_factor, D_factor = 7*[[1]]
 
 #ecs_factor, pvs_cap_factor, pvsc_ECS_factor = [1.0],[1.0],[1.0]
 
 
-def run_sensitivity(kind='serial'):
+def run_sensitivity(comps, kind='serial'):
     sim_count = 1
     
     
@@ -46,7 +55,7 @@ def run_sensitivity(kind='serial'):
                     print(f"Running simulation {sim_count} of of {N}")
                     cmd_args = n*'1 '
                     cmd_args = cmd_args[:2*(i-1)] + '%s '%p + cmd_args[2*i:]
-                    cmd = f'python3 sensitivity.py ' + cmd_args
+                    cmd = f'python3 sensitivity.py ' + cmd_args + ' %s'%comps
                     print(cmd)
                     os.system(cmd)
                     sim_count += 1
@@ -64,7 +73,7 @@ def plot_sensitivity(comps = 4):
         for p in factors:
             param = list(d.keys())[i]
             d[param] = p
-            basefolder = 'results_sensitivity_%s_comp/results-Decay-mesh16-dt200-inulin-%scomps-'%(comps, comps)
+            basefolder = 'results_sensitivity_%s_comps/results-Decay-mesh16-dt200-inulin-%scomps-'%(comps, comps)
             paramstring = '-'.join([f'{key}{value:.4f}' for key,value in d.items()])
             results = basefolder + paramstring + '/amount-multicomp-Decay-dt200.0-res16-4comps.csv'
             velocities = basefolder + paramstring + '/velocities-multicomp-Decay-dt200.0-res16-4comps.csv'
@@ -73,8 +82,9 @@ def plot_sensitivity(comps = 4):
             subplot(2,4,i+1)
             A = pd.read_csv(results)
             V = pd.read_csv(velocities)
-            plot(A.ecs)
-            print(titles[i], list(A['ecs'])[-1], float(V.ecs))
+            total_mass = A.ecs+A.pa+A.pv+A.pc
+            plot(A.t, total_mass)
+            print(titles[i], list(total_mass)[-1], float(V.ecs))
         legend(factors)
         title(titles[i])
              
@@ -85,10 +95,11 @@ def plot_sensitivity(comps = 4):
 cmd = sys.argv[1]
 if cmd == 'plot':
     try:
-        comps = int(sys.argv[2])
+        comps = sys.argv[2]
         plot_sensitivity(comps)
     except:    
         plot_sensitivity()
 elif cmd == 'run':
-    run_sensitivity() 
+    run_sensitivity(4)
+    run_sensitivity(7)
 
