@@ -14,9 +14,9 @@ diff:
 	cp main.tex paper_new.tex
 	#git checkout 3366c4f17f66add725e2f54501a2b2cf9c5bc8d2 -- main.tex
 	#cp main.tex paper_old.tex
-	cp paper_new.tex main.tex
+	#cp paper_new.tex main.tex
 	latexdiff paper_old.tex main.tex > diff.tex
 	pdflatex diff.tex
-	bibtex diff.aux
+	bibtex biblio.aux
 	pdflatex diff.tex
 	pdflatex diff.tex
